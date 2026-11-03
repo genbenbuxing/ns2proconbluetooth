@@ -1,109 +1,100 @@
-# NS2Pro Bridge — Switch 2 Pro Controller on PC over Bluetooth
+# ns2proconbluetooth — Switch 2 Pro 手柄蓝牙连接 PC（Windows / Linux）
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+让 **Nintendo Switch 2 Pro 手柄通过蓝牙 BLE 无线连接电脑**。程序把无线手柄模拟成一个有线 USB Switch 2 Pro 手柄（USB `057e:2069`），Steam 和 SDL 会把它当作普通的任天堂有线手柄识别。
 
-Connect your **Nintendo Switch 2 Pro Controller (NS2 Pro) to a PC over Bluetooth LE** with `ns2pro-bridge`. The bridge presents the wireless controller as a wired USB Switch 2 Pro Controller (USB `057e:2069`), so Steam and SDL see a normal USB controller.
+[English summary](#english-summary)
 
-Linux has been tested on real hardware. Windows currently has CI build and test coverage only; Bluetooth and driver hardware support has not yet been verified on Windows.
+## 来源声明
 
-## Connect over Bluetooth on Linux
+本项目基于 **[Cookiekira/ns2pro-bridge](https://github.com/Cookiekira/ns2pro-bridge)**（v0.4.0，GPL-3.0-or-later）修改而来，完整保留了上游的提交历史和作者署名。感谢原作者 Harvey（Cookiekira）及其参考的 [VIIPER](https://github.com/Alia5/VIIPER)、[switch2_controller_research](https://github.com/ndeadly/switch2_controller_research)、[usbip-win2](https://github.com/vadimgrn/usbip-win2)。
 
-1. Install with `cargo binstall ns2pro-bridge`, or use the shell installer:
-   ```sh
-   curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Cookiekira/ns2pro-bridge/releases/latest/download/ns2pro-bridge-installer.sh | sh
-   ```
-   For a manual install, download and extract `ns2pro-bridge-x86_64-unknown-linux-gnu.tar.xz` (or `ns2pro-bridge-aarch64-unknown-linux-gnu.tar.xz`) from [Releases](https://github.com/Cookiekira/ns2pro-bridge/releases/latest).
-2. Start with `ns2pro-bridge` (or `./ns2pro-bridge` from the extracted directory). Enter your password when prompted; the bridge loads the virtual USB driver automatically.
-3. **First time only:** press the controller's **sync button** (top edge) to pair. The bridge remembers it.
-4. Wait for `controller initialized; receiving input`. Open Steam and play.
+上游只在 Linux 上实机测试过，Windows 仅通过 CI 编译。我们在它的基础上**优化了程序，并对 Windows 支持做了验证与修复**：逐项对照 usbip-win2 驱动源码（v0.9.6.1–v0.9.8.1）核对了 Windows 端的驱动接口、USB/IP 协议和蓝牙链路，修复了导致 Windows 下无法工作的问题，并在 Windows 11 上从源码编译、通过了全部测试。
 
-Next time, run step 2 and press **Home** to wake the controller. Stop with **Ctrl+C**; the virtual controller also detaches cleanly on SIGTERM or when the terminal closes (SIGHUP).
+### Windows 支持状态
 
-Linux binaries need glibc ≥ 2.39.
-The binary runs as root after the password prompt, so keep it in a path only you can write.
-Elevation uses `sudo` in a terminal and `pkexec` when stdin is not a TTY.
-
-## Connect over Bluetooth on Windows
-
-1. Install the signed [usbip-win2](https://github.com/vadimgrn/usbip-win2) driver (supported: v0.9.6.1–v0.9.8.1).
-2. Install with `cargo binstall ns2pro-bridge`, or use the PowerShell installer:
-   ```powershell
-   irm https://github.com/Cookiekira/ns2pro-bridge/releases/latest/download/ns2pro-bridge-installer.ps1 | iex
-   ```
-   For a manual install, download and extract `ns2pro-bridge-x86_64-pc-windows-msvc.zip` from [Releases](https://github.com/Cookiekira/ns2pro-bridge/releases/latest).
-3. Run it, then press the controller's **sync button** the first time.
-
-Windows is verified by native CI build and tests only. It has not been tested on real Windows Bluetooth or driver hardware yet.
-
-## FAQ
-
-### How do I connect a Switch 2 Pro Controller to a PC wirelessly?
-
-Install the bridge using the Linux or Windows steps above, run `ns2pro-bridge`, and press the controller's sync button for the first connection. On subsequent connections, run the bridge and press Home to wake the controller.
-
-### Can Steam recognize the controller over Bluetooth?
-
-The bridge handles the Bluetooth LE connection and exposes a virtual USB Switch 2 Pro Controller to Steam and SDL. Steam sees the Nintendo controller rather than an emulated Xbox controller.
-
-## If something goes wrong
-
-| You see | Fix |
+| 项目 | 状态 |
 | --- | --- |
-| Elevation / permission error at startup | Check that `sudo` (terminal) or `pkexec` (no TTY) is installed and permits elevation. |
-| `vhci` / attach error | Check that your kernel provides `vhci-hcd` and that `modprobe` is installed; the bridge loads it automatically. |
-| Steam shows the controller but no input (Linux, 32-bit Steam) | `sudo pacman -S --needed lib32-libusb` (Arch/CachyOS; use your distro's 32-bit libusb), then fully restart Steam. |
-| `kernel removed virtual controller` | The virtual USB device was detached. Start the bridge again. |
+| Windows 11 x64 从源码编译 + 全部单元/集成测试 | ✅ 通过 |
+| usbip-win2 驱动接口（IOCTL、结构体布局）对照驱动源码核对 | ✅ 一致 |
+| USB/IP 协议对照驱动源码核对 | ✅ 已修复不兼容处（见下） |
+| 安全审计（网络、文件、进程、依赖、发布流程） | ✅ 未发现恶意行为 |
+| 真实手柄 + 真实蓝牙适配器 + usbip-win2 实机测试 | ⏳ 进行中 |
+| Windows 下蓝牙连接间隔（输入延迟） | ⏳ 需实机测量，见[延迟](#延迟) |
 
-Debug details: add `--log-level debug`. Every 5 s the log shows report rate, latency p50/p99 and the actual connection interval.
+## 相对上游的修改
 
-## Use the controller on another machine
+1. **修复：Windows 下虚拟手柄无法枚举（致命）。** usbip-win2 对非等时传输发送 `number_of_packets = -1`（见驱动 `usbip/proto.h` 的 `number_of_packets_non_isoch`），上游只接受 Linux vhci 发送的 `0`，导致 Windows 发来的第一个 USB 请求（读取设备描述符）就被拒绝、连接断开。现在两种取值都接受。（`crates/ns2pro-usb/src/usbip.rs`）
+2. **修复：退出后驱动反复重连。** usbip-win2 v0.9.7.7 起会在连接断开后自动重试导入，最长约 2 小时；上游退出时先关闭连接再拔出设备，触发了这一行为，重新启动程序时可能出现两个手柄。现在启动前和退出后都会调用 `STOP_ATTACH_ATTEMPTS` 取消驱动的重连，并把"设备已被驱动自行拔出"视为正常退出。（`crates/ns2pro-usb/src/usbip_win.rs`、`crates/ns2pro-bridge/src/usb/usbip_win.rs`）
+3. **修复：手柄休眠后被"忘记"。** 上游在扫描超时（例如手柄休眠超过 30 秒）时也会清除已记住的手柄，下次连接会重新配对、且不再限定地址。现在蓝牙超时不再清除缓存，只有真正的连接错误才会。（`crates/ns2pro-bridge/src/cache.rs`）
+4. 移除只适用于上游仓库的 release-plz 发布流程，仓库地址改为本仓库。
 
-1. On the machine with Bluetooth: `ns2pro-bridge --no-auto-attach --usb-addr 0.0.0.0:3241`
-2. On the other machine: `sudo usbip --tcp-port 3241 attach -r HOST -b 1-1`
+## 在 Windows 上使用
 
-The USB/IP server has no authentication: expose it only to trusted machines.
+1. **安装 usbip-win2 驱动**：从 [usbip-win2 Releases](https://github.com/vadimgrn/usbip-win2/releases) 下载并安装已签名的版本（支持 v0.9.6.1–v0.9.8.1）。这是内核驱动，需要管理员权限，请自行确认来源后安装。
+2. **获取程序**：从源码编译（推荐，见下方），或使用本仓库 Releases 中的 `ns2pro-bridge-x86_64-pc-windows-msvc.zip`（如有）。
+3. **运行** `ns2pro-bridge.exe`，首次连接时按下手柄顶部的**同步键（SYNC）**进行配对，程序会记住手柄。
+4. 看到 `controller initialized; receiving input` 后打开 Steam 即可。下次使用时运行程序并按 **Home** 键唤醒手柄。按 **Ctrl+C** 退出。
 
-## Options
+> ⚠️ **不要在 Windows 设置里配对这个手柄。** 否则 Windows 会一直占用手柄的蓝牙连接，程序将扫描不到它。如果已经配对过，请先在"设置 → 蓝牙和设备"里删除该设备。
 
-| Option | Default | What it does |
-| --- | --- | --- |
-| `--forget-device` | off | Forget the saved controller and pair again |
-| `--device-address MAC` | cache | Connect to this controller address |
-| `--no-auto-attach` | off | Serve USB/IP over TCP instead of attaching locally |
-| `--usb-addr HOST:PORT` | `localhost:3241` | USB/IP server address |
-| `--log-level LEVEL` | `info` | `trace`/`debug`/`info`/`warn`/`error`/`off`; `RUST_LOG` wins |
+可先运行 `ns2pro-bridge.exe --bt-smoke-test` 检查蓝牙适配器能否正常扫描。
 
-More options:
+### 延迟
 
-| Option | Default | What it does |
-| --- | --- | --- |
-| `--pair-host` | off | Re-pair the host once per run |
-| `--host-address MAC` | adapter | Host address used for pairing |
-| `--cache-file PATH` | Linux: `/var/lib/ns2pro-bridge/controller-cache.json`; Windows: local app data `ns2pro-bridge/controller-cache.json` | Saved controller, JSON `{"address":"AA:BB:CC:DD:EE:FF"}` |
-| `--feature-flags FLAGS` | `0x07` | Buttons, sticks, IMU (hex or decimal) |
+Linux 下程序可以把蓝牙连接间隔设为 7.5 ms；Windows 不允许普通程序强制指定间隔，只能请求"吞吐量优先"，实际值由系统、蓝牙驱动和手柄共同决定。程序每次连接都会在日志中打印实际间隔：
 
-Exit codes: `0` normal, `1` runtime failure, `2` bad arguments or USB setup failure. Options are case-sensitive; there is no `/?` alias.
+```
+Observed BLE connection interval  interval_units_1_25_ms=N
+```
 
-## What to expect
+N 的单位是 1.25 ms：6 = 7.5 ms（理想），12 = 15 ms（良好），24 及以上 = 30 ms 以上（可能感觉到延迟）。加 `--log-level debug` 每 5 秒还会输出报告频率和延迟 p50/p99。如果延迟不理想，可以改用 USB-C 有线连接。
 
-- **Latency:** the bridge itself adds about 25–50 µs (p99) on the tested machine.
-- **Bluetooth interval:** Linux asks for **7.5 ms** (default is often 48.75 ms) and logs the result. 5 ms is not supported on any verified adapter.
-- **Disconnects:** buttons and sticks return to neutral immediately. The bridge reconnects automatically, restores player LEDs and drops old rumble.
-- **Tested hardware:** Linux x64 with a MediaTek MT7922 adapter. arm64 and Windows: CI only.
+## 在 Linux 上使用
 
-## Build from source
+运行 `ns2pro-bridge`，按提示输入密码（程序会通过 `sudo`/`pkexec` 提权并自动加载 `vhci-hcd`），首次连接按同步键。Linux 二进制要求 glibc ≥ 2.39。32 位 Steam 能看到手柄但没有输入时，请安装 32 位 libusb（如 Arch 上的 `lib32-libusb`）并重启 Steam。
+
+## 从源码编译
+
+需要 Rust（`rust-toolchain.toml` 会自动安装指定版本）；Windows 还需要 Visual Studio Build Tools 的 C++ 工具。
 
 ```sh
 cargo build --locked --release -p ns2pro-bridge
 cargo test --locked --workspace
 ```
 
-Output: `target/release/ns2pro-bridge` (`.exe` on Windows). Needs stable Rust (edition 2024).
+输出：`target/release/ns2pro-bridge`（Windows 下为 `.exe`）。
 
-## Credits and license
+## 命令行选项
 
-- **[VIIPER](https://github.com/Alia5/VIIPER)** by Alia5 (GPL-3.0): the virtual USB device model, descriptors and test fixtures are ported from VIIPER. Its license is in [LICENSES/VIIPER-GPL-3.0.txt](LICENSES/VIIPER-GPL-3.0.txt).
-- **[switch2_controller_research](https://github.com/ndeadly/switch2_controller_research)**: controller protocol research.
-- **[usbip-win2](https://github.com/vadimgrn/usbip-win2)**: Windows USB/IP driver (installed separately).
+| 选项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `--forget-device` | 关闭 | 忘记已保存的手柄并重新配对 |
+| `--device-address MAC` | 使用缓存 | 连接指定地址的手柄 |
+| `--no-auto-attach` | 关闭 | 只提供 USB/IP 服务，不在本机挂载 |
+| `--usb-addr HOST:PORT` | `localhost:3241` | USB/IP 服务地址 |
+| `--log-level LEVEL` | `info` | `trace`/`debug`/`info`/`warn`/`error`/`off`；`RUST_LOG` 优先 |
+| `--pair-host` | 关闭 | 每次运行时重新配对主机一次 |
+| `--host-address MAC` | 适配器地址 | 配对时使用的主机地址 |
+| `--cache-file PATH` | Windows：`%LOCALAPPDATA%\ns2pro-bridge\controller-cache.json`；Linux：`/var/lib/ns2pro-bridge/controller-cache.json` | 保存手柄地址 |
+| `--feature-flags FLAGS` | `0x07` | 按键、摇杆、IMU 功能标志 |
+| `--bt-smoke-test` | 关闭 | 只检查蓝牙适配器和扫描 |
 
-This project is GPL-3.0-or-later; see [LICENSE.txt](LICENSE.txt) and [THIRD_PARTY.md](THIRD_PARTY.md).
+> 🔒 USB/IP 服务**没有身份验证**。默认只监听本机回环地址；不要把 `--usb-addr` 设为 `0.0.0.0` 等对外地址，否则局域网内任何人都可以读取手柄输入、控制震动和指示灯。
+
+## 许可证
+
+本项目沿用上游的 **GPL-3.0-or-later**（见 [LICENSE.txt](LICENSE.txt)）。由于代码派生自 GPL 授权的 ns2pro-bridge 和 VIIPER（GPL-3.0，见 [LICENSES/VIIPER-GPL-3.0.txt](LICENSES/VIIPER-GPL-3.0.txt)），修改版必须以相同或兼容的 GPL 许可证发布，不能改为 MIT 等宽松许可证。第三方来源与修改声明见 [THIRD_PARTY.md](THIRD_PARTY.md)。
+
+本项目与任天堂无关。Nintendo Switch 是任天堂的商标。
+
+---
+
+## English summary
+
+A fork of [Cookiekira/ns2pro-bridge](https://github.com/Cookiekira/ns2pro-bridge) (GPL-3.0-or-later) that connects a Nintendo Switch 2 Pro Controller to a PC over Bluetooth LE and exposes it as a wired USB controller for Steam/SDL. Upstream was only tested on Linux; this fork reviewed the Windows path against the usbip-win2 driver source and fixed:
+
+1. USB/IP submits from usbip-win2 carry `number_of_packets = -1` for non-isochronous transfers; upstream rejected them, so enumeration failed on Windows.
+2. usbip-win2 ≥ 0.9.7.7 re-attaches for hours after the connection drops; the bridge now cancels those attempts (`STOP_ATTACH_ATTEMPTS`) before attaching and after detaching.
+3. A Bluetooth timeout (e.g. sleeping controller) no longer forgets the cached controller.
+
+Builds and passes all tests on Windows 11 x64. Real-hardware testing on Windows is in progress. Do not pair the controller in Windows Bluetooth settings. License: GPL-3.0-or-later.

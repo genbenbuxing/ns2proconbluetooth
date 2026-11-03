@@ -19,7 +19,7 @@ use windows::{
         Foundation::{
             ERROR_INSUFFICIENT_BUFFER, ERROR_IO_PENDING, ERROR_NO_MORE_ITEMS, GENERIC_READ,
             GENERIC_WRITE, HANDLE, RtlNtStatusToDosError, STATUS_BUFFER_TOO_SMALL,
-            STATUS_INVALID_BUFFER_SIZE, WAIT_OBJECT_0, WAIT_TIMEOUT,
+            STATUS_DEVICE_NOT_CONNECTED, STATUS_INVALID_BUFFER_SIZE, WAIT_OBJECT_0, WAIT_TIMEOUT,
         },
         Storage::FileSystem::{
             CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_FLAG_OVERLAPPED, FILE_SHARE_READ,
@@ -282,14 +282,54 @@ fn ioctl(
 }
 fn detach_port(handle: &OwnedHandle, port: i32) -> Result<(), AttachError> {
     let mut request = wire::plugout(port).map_err(platform)?;
-    ioctl(
+    match ioctl(
         handle,
         wire::PLUGOUT_HARDWARE,
         &mut request,
         0,
         &CancellationToken::new(),
-    )?;
-    Ok(())
+    ) {
+        // The listener closes before this unplug, and the driver detaches a device
+        // whose connection closed on its own: the port is already free.
+        Err(AttachError::Io(error))
+            if error.raw_os_error() == Some(dos_error(STATUS_DEVICE_NOT_CONNECTED)) =>
+        {
+            tracing::debug!(port, "usbip-win2 port was already released");
+            Ok(())
+        }
+        result => result.map(drop),
+    }
+}
+/// Best effort: cancels usbip-win2 re-attach attempts for `address`. From
+/// v.0.9.7.7 the driver retries an import for hours after its connection drops,
+/// which would import a stale or duplicate device into a later bridge run.
+/// v.0.9.6.1 has no such IOCTL and never retries, so failures are only logged.
+fn stop_reattach(handle: &OwnedHandle, address: SocketAddr) {
+    for abi in wire::Abi::SUPPORTED {
+        let Ok(mut request) = wire::stop_attempts(address, abi) else {
+            return;
+        };
+        let Ok(output_len) = u32::try_from(request.len()) else {
+            return;
+        };
+        match ioctl(
+            handle,
+            wire::STOP_ATTACH_ATTEMPTS,
+            &mut request,
+            output_len,
+            &CancellationToken::new(),
+        ) {
+            Ok(_) => {
+                tracing::debug!(%address, "Cancelled pending usbip-win2 re-attach attempts");
+                return;
+            }
+            Err(error) if size_rejected(&error) => {}
+            Err(error) => {
+                tracing::debug!(%error, "usbip-win2 re-attach cancellation unavailable");
+                return;
+            }
+        }
+    }
 }
 
 /// A device imported into usbip-win2; a blocking worker holds the port until
@@ -344,6 +384,8 @@ impl Attached {
                     reason = "PORT_END is 8"
                 )]
                 let port_len = wire::PORT_END as u32;
+                // Attempts left by an earlier run that exited or crashed.
+                stop_reattach(&handle, address);
                 for abi in wire::Abi::SUPPORTED {
                     let mut request = wire::plugin(address, abi).map_err(platform)?;
                     match ioctl(
@@ -377,7 +419,10 @@ impl Attached {
                 tracing::info!(port, %address, "Attached virtual USB device through usbip-win2");
                 futures::executor::block_on(worker_stop.cancelled());
             }
-            detach_port(&handle, port)
+            let detached = detach_port(&handle, port);
+            // Closing the listener first already scheduled a re-attach.
+            stop_reattach(&handle, address);
+            detached
         });
         // Attached's Drop cancels the worker on every failure or dropped future.
         let mut attached = Self {

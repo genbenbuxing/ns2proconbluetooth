@@ -6,6 +6,11 @@ use std::net::SocketAddr;
 pub const PLUGIN_HARDWARE: u32 = 0x0022_e000;
 /// usbip-win2 plugout-hardware IOCTL code.
 pub const PLUGOUT_HARDWARE: u32 = 0x0022_e004;
+/// usbip-win2 stop-attach-attempts IOCTL code (function 0x805, v.0.9.7.7 and later).
+///
+/// From v.0.9.7.7 the driver schedules re-attach attempts whenever an imported
+/// device's connection drops, including when the bridge exits; this cancels them.
+pub const STOP_ATTACH_ATTEMPTS: u32 = 0x0022_e014;
 #[cfg(test)]
 const PLUGIN_SIZE: usize = 1100;
 /// Bytes of a plugin response up to and including the assigned port.
@@ -43,6 +48,13 @@ impl Abi {
         match self {
             Self::V0981 => 12,
             _ => 8,
+        }
+    }
+    /// `stop_attach_attempts` size: base, `imported_device_location`, then `count`.
+    const fn stop_wire_size(self) -> u16 {
+        match self {
+            Self::V0981 => 1108,
+            Self::V0978 | Self::V0977 => 1104,
         }
     }
 }
@@ -86,13 +98,33 @@ impl std::error::Error for WireError {}
 /// [`WireError::ZeroPort`] or [`WireError::InvalidHost`] for an address the
 /// driver cannot attach to.
 pub fn plugin(address: SocketAddr, abi: Abi) -> Result<Vec<u8>, WireError> {
+    // v.0.9.8.1 exposes the driver's low-latency WSK receive-events mode.
+    let low_latency = matches!(abi, Abi::V0981).then_some((1120, &[1u8][..]));
+    location(address, abi, abi.wire_size(), low_latency)
+}
+/// Encodes a [`STOP_ATTACH_ATTEMPTS`] request for the same location as [`plugin`].
+/// The driver matches pending attempts by a hash of host, service and busid, so
+/// `address` must be the one passed to [`plugin`].
+///
+/// # Errors
+///
+/// As for [`plugin`].
+pub fn stop_attempts(address: SocketAddr, abi: Abi) -> Result<Vec<u8>, WireError> {
+    location(address, abi, abi.stop_wire_size(), None)
+}
+fn location(
+    address: SocketAddr,
+    abi: Abi,
+    size: u16,
+    extra: Option<(usize, &[u8])>,
+) -> Result<Vec<u8>, WireError> {
     if address.port() == 0 {
         return Err(WireError::ZeroPort);
     }
     if address.ip().is_unspecified() {
         return Err(WireError::InvalidHost);
     }
-    let mut request = vec![0; abi.size()];
+    let mut request = vec![0; usize::from(size)];
     let busid = abi.busid();
     let service_offset = busid + 32;
     let service = address.port().to_string();
@@ -104,16 +136,14 @@ pub fn plugin(address: SocketAddr, abi: Abi) -> Result<Vec<u8>, WireError> {
         }
         SocketAddr::V6(address) => address.ip().to_string(),
     };
-    // v.0.9.8.1 exposes the driver's low-latency WSK receive-events mode.
-    let low_latency = matches!(abi, Abi::V0981).then_some((1120, &[1u8][..]));
     for (offset, field) in [
-        (0, &u32::from(abi.wire_size()).to_le_bytes()[..]),
+        (0, &u32::from(size).to_le_bytes()[..]),
         (busid, b"1-1"),
         (service_offset, service.as_bytes()),
         (host_offset, host.as_bytes()),
     ]
     .into_iter()
-    .chain(low_latency)
+    .chain(extra)
     {
         #[expect(
             clippy::indexing_slicing,
@@ -217,6 +247,30 @@ mod tests {
             }
         }
         assert!(attached_port(&[], 8).is_err());
+    }
+    #[test]
+    fn stop_attempts_reuses_plugin_location_with_released_sizes() {
+        assert_eq!(
+            STOP_ATTACH_ATTEMPTS,
+            (0x22 << 16) | (3 << 14) | (0x805 << 2)
+        );
+        let address = "127.0.0.1:3241".parse().unwrap();
+        for (abi, size) in [(Abi::V0981, 1108), (Abi::V0978, 1104), (Abi::V0977, 1104)] {
+            let stop = stop_attempts(address, abi).unwrap();
+            let plugin = plugin(address, abi).unwrap();
+            assert_eq!(stop.len(), size);
+            assert_eq!(
+                u32::from_le_bytes(stop[..4].try_into().unwrap()),
+                u32::try_from(size).unwrap()
+            );
+            let location = abi.busid()..abi.busid() + 32 + 32 + 1025;
+            assert_eq!(stop[location.clone()], plugin[location]);
+            assert!(stop[abi.busid() + 32 + 32 + 1025..].iter().all(|b| *b == 0));
+        }
+        assert_eq!(
+            stop_attempts("0.0.0.0:3241".parse().unwrap(), Abi::V0977),
+            Err(WireError::InvalidHost)
+        );
     }
     #[test]
     fn detach_can_only_target_owned_positive_port() {

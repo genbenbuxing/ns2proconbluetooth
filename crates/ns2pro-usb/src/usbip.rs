@@ -5,6 +5,8 @@
 pub struct UsbipError(pub &'static str);
 /// Largest transfer the bridge accepts.
 pub const MAX_TRANSFER: usize = 1024 * 1024;
+/// `number_of_packets` value (-1) that usbip-win2 sends for non-isochronous submits.
+const NON_ISOCHRONOUS_PACKETS: u32 = u32::MAX;
 /// A decoded `USBIP_CMD_SUBMIT` or `USBIP_CMD_UNLINK` header.
 #[derive(Clone, Copy, Debug)]
 pub struct Urb {
@@ -62,8 +64,10 @@ impl Urb {
             0
         };
         let (direction, ep) = (word(direction), word(ep));
-        if length > MAX_TRANSFER || direction > 1 || ep > 15 || (command == 1 && word(packets) != 0)
-        {
+        // Linux vhci-hcd sends 0 packets for non-isochronous submits; usbip-win2
+        // sends -1 (`number_of_packets_non_isoch`, usbip/proto.h).
+        let isochronous = !matches!(word(packets), 0 | NON_ISOCHRONOUS_PACKETS);
+        if length > MAX_TRANSFER || direction > 1 || ep > 15 || (command == 1 && isochronous) {
             return Err(UsbipError(
                 "invalid length, endpoint or isochronous request",
             ));
@@ -240,6 +244,20 @@ mod tests {
         let mut out = Vec::new();
         reply_into(&mut out, urb, 0, &[], 0x1_0000_0007);
         assert_eq!(out[24..28], 7u32.to_be_bytes());
+    }
+
+    #[test]
+    fn submit_packet_counts_accept_linux_and_usbip_win2_non_isochronous_markers() {
+        let submit = |packets: u32| {
+            let mut h = [0; 48];
+            h[..4].copy_from_slice(&1u32.to_be_bytes());
+            h[32..36].copy_from_slice(&packets.to_be_bytes());
+            Urb::decode(&h)
+        };
+        assert!(submit(0).is_ok());
+        assert!(submit(u32::MAX).is_ok());
+        assert!(submit(1).is_err());
+        assert!(submit(32).is_err());
     }
 
     #[test]

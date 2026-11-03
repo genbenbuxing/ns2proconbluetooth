@@ -107,13 +107,16 @@ impl Selection<'_> {
         result: Result<(), SessionError>,
     ) -> Result<(), SessionError> {
         // An established session leaves a valid cache; failed cached attempts invalidate it.
+        // A Bluetooth timeout usually means the controller is asleep, not that it is
+        // the wrong one: forgetting it would re-pair with whichever controller wakes next.
         if self.from_cache
             && !cancelled
             && !established
             && result.as_ref().is_err_and(|error| {
                 !matches!(
                     error,
-                    SessionError::Bluetooth(BleError::Cancelled) | SessionError::Cancelled
+                    SessionError::Bluetooth(BleError::Cancelled | BleError::Timeout)
+                        | SessionError::Cancelled
                 )
             })
         {
@@ -167,7 +170,11 @@ mod tests {
                     for cancelled in [false, true] {
                         let outcomes = [
                             (Ok(()), false),
-                            (Err(SessionError::Bluetooth(BleError::Timeout)), true),
+                            (Err(SessionError::Bluetooth(BleError::Timeout)), false),
+                            (
+                                Err(SessionError::Bluetooth(BleError::Platform("gatt".into()))),
+                                true,
+                            ),
                             (Err(SessionError::Bluetooth(BleError::Cancelled)), false),
                             (Err(SessionError::Cancelled), false),
                             (
@@ -253,7 +260,7 @@ mod tests {
         let result = selection.settle(
             false,
             false,
-            Err(SessionError::Bluetooth(BleError::Timeout)),
+            Err(SessionError::Bluetooth(BleError::Platform("gatt".into()))),
         );
         assert!(matches!(result, Err(SessionError::Cache(_))));
     }

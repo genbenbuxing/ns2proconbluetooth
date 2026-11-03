@@ -7,7 +7,7 @@ version = "0.4.0"
 edition = "2024"
 rust-version = "1.88"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/Cookiekira/ns2pro-bridge"
+repository = "https://github.com/genbenbuxing/ns2proconbluetooth"
 readme = "README.md"
 
 [workspace.dependencies]
