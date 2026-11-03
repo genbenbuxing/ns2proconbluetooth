@@ -15,7 +15,7 @@ use ns2pro_bridge::{
 use ns2pro_proto::{command, gatt::Characteristic, input::Buttons};
 use tokio_util::sync::CancellationToken;
 #[tokio::test(start_paused = true)]
-async fn failed_cached_acquisition_invalidates_but_explicit_address_wins() {
+async fn failed_cached_acquisition_keeps_cache_and_explicit_address_wins() {
     let cache = TestCache::new();
     Cache::new(cache.path()).save(address(1)).unwrap();
     let radio = FakeController::new(FakeOptions {
@@ -43,10 +43,12 @@ async fn failed_cached_acquisition_invalidates_but_explicit_address_wins() {
             .result
             .is_err()
     );
-    assert_eq!(Cache::new(cache.path()).load().unwrap(), None);
+    // A refused Bluetooth connection is a radio problem, not a wrong controller.
+    assert_eq!(radio.observed().scans, [Some(address(2)), Some(address(1))]);
+    assert_eq!(Cache::new(cache.path()).load().unwrap(), Some(address(1)));
 }
 #[tokio::test(start_paused = true)]
-async fn cancellation_preserves_cache_and_partial_setup_releases_link() {
+async fn cancellation_and_link_failure_preserve_cache_and_release_link() {
     let cache = TestCache::new();
     Cache::new(cache.path()).save(address(1)).unwrap();
     let radio = FakeController::new(FakeOptions {
@@ -83,7 +85,8 @@ async fn cancellation_preserves_cache_and_partial_setup_releases_link() {
         .is_err()
     );
     assert_eq!(radio.observed().closes, 1);
-    assert_eq!(Cache::new(cache.path()).load().unwrap(), None);
+    // A GATT failure during setup is a link problem; the controller stays remembered.
+    assert_eq!(Cache::new(cache.path()).load().unwrap(), Some(address(1)));
 }
 #[tokio::test(start_paused = true)]
 async fn disconnect_neutral_reaches_usb_peer_and_reconnect_replays_led_without_old_rumble() {

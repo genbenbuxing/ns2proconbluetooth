@@ -30,6 +30,7 @@ eframe = { version = "0.37", default-features = false, features = ["glow", "defa
 tray-icon = "0.26"
 raw-window-handle = "0.6"
 windows = { workspace = true, features = [
+  "Win32_Devices_DeviceAndDriverInstallation",
   "Win32_Foundation",
   "Win32_Globalization",
   "Win32_System_Registry",

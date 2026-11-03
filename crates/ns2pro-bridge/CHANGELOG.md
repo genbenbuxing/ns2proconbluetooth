@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1](https://github.com/genbenbuxing/ns2proconbluetooth/compare/v0.5.0...v0.5.1) - 2026-11-04
+
+### Added
+
+- Desktop app: when a controller is plugged in by USB cable, the Bluetooth bridge pauses and its virtual controller is removed, so Windows does not show two controllers; Bluetooth resumes automatically when the cable is unplugged.
+- Desktop app: the log is also written to `%LOCALAPPDATA%\ns2pro-bridge\gui.log` (previous run in `gui.log.old`), with an "Open log folder" button on the Log tab.
+
+### Fixed
+
+- A dropped or unreachable Bluetooth/GATT link no longer forgets the remembered controller, so a brief drop no longer forces pairing again. The controller is forgotten only when it answers commands or pairing incorrectly.
+
+### Known issues (under investigation)
+
+- After the bridge pauses for a plugged-in cable, Steam may not use the wired controller (it reports it as "If_Hid" and does not initialize it). Bluetooth works normally. Until this is fixed, keep using Bluetooth.
+
 ## [0.5.0](https://github.com/genbenbuxing/ns2proconbluetooth/compare/v0.4.0...v0.5.0) - 2026-11-03
 
 First release of this fork of [Cookiekira/ns2pro-bridge](https://github.com/Cookiekira/ns2pro-bridge), with Windows support verified on real hardware.

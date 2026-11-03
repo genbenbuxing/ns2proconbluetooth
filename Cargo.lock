@@ -2068,7 +2068,7 @@ checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
 name = "ns2pro-bridge"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "clap",
  "dirs",
@@ -2090,7 +2090,7 @@ dependencies = [
 
 [[package]]
 name = "ns2pro-gui"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "clap",
  "dirs",
@@ -2110,7 +2110,7 @@ dependencies = [
 
 [[package]]
 name = "ns2pro-proto"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "aes",
  "thiserror 2.0.21",
@@ -2119,7 +2119,7 @@ dependencies = [
 
 [[package]]
 name = "ns2pro-usb"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "hex",
  "ns2pro-proto",

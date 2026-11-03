@@ -14,6 +14,8 @@ mod settings;
 mod system;
 #[cfg(windows)]
 mod tray;
+#[cfg(windows)]
+mod wired;
 
 #[cfg(not(windows))]
 fn main() {
@@ -42,10 +44,26 @@ fn main() -> eframe::Result {
         bridge::StatusLayer(std::sync::Arc::clone(&bridge)).with_filter(filter_fn(|metadata| {
             metadata.target().starts_with("ns2pro_bridge")
         }));
+    // The same events, with timestamps, in %LOCALAPPDATA%\ns2pro-bridge\gui.log.
+    let file = bridge::open_log_file().map(|(file, _)| {
+        tracing_subscriber::fmt::layer()
+            .with_writer(std::sync::Mutex::new(file))
+            .with_ansi(false)
+            .with_filter(filter_fn(|metadata| {
+                metadata.target().starts_with("ns2pro_bridge")
+            }))
+    });
     let subscriber = tracing_subscriber::registry()
         .with(EnvFilter::new("info,ns2pro_bridge::stats=debug"))
-        .with(status);
+        .with(status)
+        .with(file);
     let _ = tracing::subscriber::set_global_default(subscriber);
+    tracing::info!(
+        version = env!("CARGO_PKG_VERSION"),
+        "ns2pro-bridge-gui started"
+    );
+
+    bridge.watch_wired();
 
     // Started by Windows at login: stay in the tray.
     let minimized = std::env::args().any(|arg| arg == "--minimized");

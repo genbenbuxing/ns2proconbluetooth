@@ -4,7 +4,10 @@ use ns2pro_bridge::{app, cache::Cache, cli::Options};
 use std::{
     collections::{HashMap, VecDeque},
     fmt::Write as _,
-    sync::{Arc, Mutex, MutexGuard},
+    sync::{
+        Arc, Mutex, MutexGuard,
+        atomic::{AtomicBool, Ordering},
+    },
     thread::JoinHandle,
     time::Duration,
 };
@@ -57,6 +60,10 @@ pub struct Bridge {
     status: Mutex<Status>,
     run: Mutex<Option<Run>>,
     repaint: Mutex<Option<Repaint>>,
+    /// A real controller is plugged in by USB cable.
+    wired: AtomicBool,
+    /// The bridge was stopped because of the cable and resumes when it is unplugged.
+    paused_for_wire: AtomicBool,
 }
 
 struct Run {
@@ -76,6 +83,8 @@ impl Bridge {
             status: Mutex::new(Status::default()),
             run: Mutex::new(None),
             repaint: Mutex::new(None),
+            wired: AtomicBool::new(false),
+            paused_for_wire: AtomicBool::new(false),
         })
     }
 
@@ -100,8 +109,47 @@ impl Bridge {
             .is_some_and(|run| !run.thread.is_finished())
     }
 
-    /// Starts connecting; does nothing while a previous run is still active.
+    pub fn wired(&self) -> bool {
+        self.wired.load(Ordering::Relaxed)
+    }
+
+    /// Polls for a controller plugged in by cable. While one is, the bridge stays
+    /// stopped so Steam uses the wired controller instead of a silent virtual one.
+    pub fn watch_wired(self: &Arc<Self>) {
+        self.wired
+            .store(crate::wired::controller_plugged_in(), Ordering::Relaxed);
+        let bridge = Arc::clone(self);
+        std::thread::spawn(move || {
+            loop {
+                let now = crate::wired::controller_plugged_in();
+                let was = bridge.wired.swap(now, Ordering::Relaxed);
+                if now && !was {
+                    tracing::info!("wired controller detected; pausing the Bluetooth bridge");
+                    if bridge.is_running() {
+                        bridge.paused_for_wire.store(true, Ordering::Relaxed);
+                        bridge.disconnect();
+                    }
+                    bridge.repaint();
+                } else if !now && was {
+                    tracing::info!("wired controller unplugged");
+                    if bridge.paused_for_wire.swap(false, Ordering::Relaxed) {
+                        // Let the previous run finish releasing the device first.
+                        bridge.disconnect_and_wait(Duration::from_secs(10));
+                        bridge.connect();
+                    }
+                    bridge.repaint();
+                }
+                std::thread::sleep(Duration::from_secs(2));
+            }
+        });
+    }
+
+    /// Starts connecting; does nothing while a previous run is still active or a
+    /// controller is plugged in by cable.
     pub fn connect(self: &Arc<Self>) {
+        if self.wired() {
+            return;
+        }
         let mut run = lock(&self.run);
         if run.as_ref().is_some_and(|run| !run.thread.is_finished()) {
             return;
@@ -265,6 +313,16 @@ pub fn check_bluetooth() -> Result<(), String> {
     local
         .block_on(&runtime, app::check_bluetooth())
         .map_err(|e| e.to_string())
+}
+
+/// `%LOCALAPPDATA%\ns2pro-bridge\gui.log`; the previous run's log is kept as `gui.log.old`.
+pub fn open_log_file() -> Option<(std::fs::File, std::path::PathBuf)> {
+    let dir = dirs::data_local_dir()?.join("ns2pro-bridge");
+    std::fs::create_dir_all(&dir).ok()?;
+    let path = dir.join("gui.log");
+    let _ = std::fs::rename(&path, dir.join("gui.log.old"));
+    let file = std::fs::File::create(&path).ok()?;
+    Some((file, path))
 }
 
 /// Feeds bridge log events into [`Bridge`] state and the in-window log.

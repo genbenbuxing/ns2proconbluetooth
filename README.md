@@ -47,8 +47,15 @@ You also need a Bluetooth adapter with Bluetooth LE support and a working driver
 - **System check** for the Bluetooth LE adapter and the usbip-win2 driver, with a link to the official usbip-win2 download page when it is missing (the app does not download or install anything itself).
 - **Tray icon**: closing the window keeps it running in the notification area (optional); the tray menu can show the window, connect, disconnect or quit. **Start with Windows** starts it minimized to the tray.
 - **Chinese / English** interface, following the Windows language by default.
+- **Cable detection**: when the controller is plugged in by USB cable, the Bluetooth bridge pauses and removes its virtual controller, so Windows does not see two controllers; Bluetooth resumes when the cable is unplugged.
+- **Log file**: `%LOCALAPPDATA%\ns2pro-bridge\gui.log` (the previous run is kept as `gui.log.old`); the Log tab has an "Open log folder" button.
 
 Quitting (tray menu → Quit, or closing the window with tray mode off) always releases the controller and unplugs the virtual USB device first. Only one copy of the app runs at a time; do not run it together with the command-line `ns2pro-bridge.exe`. Settings are stored in `%LOCALAPPDATA%\ns2pro-bridge\gui-settings.json`.
+
+### Known issues (under investigation)
+
+- **Wired after Bluetooth**: after the bridge pauses for a plugged-in cable, Steam may not use the wired controller (Steam's controller log shows it as "If_Hid" and it is not initialized). Bluetooth is not affected. For now, keep using Bluetooth; a fix is being worked on.
+- **Bluetooth stutter or drops**: usually weak signal. On motherboards with Wi-Fi/Bluetooth, make sure the Wi-Fi antenna is attached; it is shared with Bluetooth.
 
 ## Using it on Windows
 

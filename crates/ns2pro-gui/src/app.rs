@@ -228,7 +228,9 @@ impl App {
                     ui.end_row();
                 }
             });
-        if let Some(error) = &status.error {
+        if self.bridge.wired() {
+            ui.colored_label(AMBER, t.wired_paused);
+        } else if let Some(error) = &status.error {
             ui.colored_label(RED, error);
         }
         if matches!(status.phase, Phase::Searching | Phase::Idle | Phase::Failed) {
@@ -252,7 +254,11 @@ impl App {
                 egui::Button::new(RichText::new(t.connect).color(Color32::WHITE).strong())
                     .fill(Color32::from_rgb(40, 120, 220))
                     .min_size(size);
-            if ui.add_enabled(!running && ready, connect).clicked() {
+            let wired = self.bridge.wired();
+            if ui
+                .add_enabled(!running && ready && !wired, connect)
+                .clicked()
+            {
                 self.notice = None;
                 self.bridge.connect();
             }
@@ -388,7 +394,19 @@ impl App {
         }
     }
 
-    fn log_ui(&self, ui: &mut egui::Ui) {
+    fn log_ui(&self, ui: &mut egui::Ui, t: &Text) {
+        if let Some(dir) = dirs::data_local_dir().map(|dir| dir.join("ns2pro-bridge")) {
+            ui.horizontal(|ui| {
+                if ui.button(t.open_log_folder).clicked() {
+                    let _ = std::process::Command::new("explorer").arg(&dir).spawn();
+                }
+                ui.label(
+                    RichText::new(dir.join("gui.log").display().to_string())
+                        .small()
+                        .weak(),
+                );
+            });
+        }
         egui::ScrollArea::vertical()
             .auto_shrink(false)
             .stick_to_bottom(true)
@@ -459,7 +477,7 @@ impl eframe::App for App {
             Tab::Settings => {
                 card(ui, t.settings, |ui| self.settings_ui(ui, t));
             }
-            Tab::Log => self.log_ui(ui),
+            Tab::Log => self.log_ui(ui, t),
         });
     }
 }

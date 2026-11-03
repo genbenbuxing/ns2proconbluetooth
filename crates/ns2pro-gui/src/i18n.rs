@@ -75,6 +75,8 @@ pub struct Text {
     pub tray_quit: &'static str,
     pub already_running: &'static str,
     pub cancel: &'static str,
+    pub wired_paused: &'static str,
+    pub open_log_folder: &'static str,
 }
 
 const ZH: Text = Text {
@@ -124,6 +126,8 @@ const ZH: Text = Text {
     tray_quit: "退出",
     already_running: "NS2 Pro 手柄蓝牙连接已在运行，请在任务栏右下角的托盘图标中打开。",
     cancel: "取消",
+    wired_paused: "检测到用数据线连接的手柄：蓝牙桥接已暂停，Steam 会直接使用有线手柄。拔掉数据线后会自动恢复蓝牙连接。",
+    open_log_folder: "打开日志文件夹",
 };
 
 const EN: Text = Text {
@@ -173,4 +177,6 @@ const EN: Text = Text {
     tray_quit: "Quit",
     already_running: "NS2 Pro Controller Bluetooth Bridge is already running. Open it from the tray icon.",
     cancel: "Cancel",
+    wired_paused: "A controller is connected by USB cable: the Bluetooth bridge is paused and Steam uses the wired controller. Bluetooth resumes when the cable is unplugged.",
+    open_log_folder: "Open log folder",
 };

@@ -1,6 +1,6 @@
 //! Remembers the last controller so later runs target it. A fresh advertisement
 //! is still required before connecting.
-use crate::{ble::BleError, session::SessionError};
+use crate::{controller::ControllerError, session::SessionError};
 use ns2pro_proto::Address;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -106,16 +106,21 @@ impl Selection<'_> {
         cancelled: bool,
         result: Result<(), SessionError>,
     ) -> Result<(), SessionError> {
-        // An established session leaves a valid cache; failed cached attempts invalidate it.
-        // A Bluetooth timeout usually means the controller is asleep, not that it is
-        // the wrong one: forgetting it would re-pair with whichever controller wakes next.
+        // An established session leaves a valid cache. A failed cached attempt invalidates
+        // it only when the controller itself misbehaved (bad responses, pairing, key
+        // generation) or the cache failed. Bluetooth and GATT link failures (a sleeping
+        // or out-of-range controller, an unreachable or dropped link) are radio problems:
+        // forgetting the controller would re-pair with whichever controller wakes next.
         if self.from_cache
             && !cancelled
             && !established
             && result.as_ref().is_err_and(|error| {
                 !matches!(
                     error,
-                    SessionError::Bluetooth(BleError::Cancelled | BleError::Timeout)
+                    SessionError::Bluetooth(_)
+                        | SessionError::Controller(
+                            ControllerError::Link(_) | ControllerError::Cancelled
+                        )
                         | SessionError::Cancelled
                 )
             })
@@ -137,7 +142,8 @@ fn replace(from: &Path, to: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ble::LinkError, controller::ControllerError};
+    use crate::ble::{BleError, LinkError};
+    use ns2pro_proto::command::ResponseError;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct TestCache(Cache);
@@ -173,17 +179,35 @@ mod tests {
                             (Err(SessionError::Bluetooth(BleError::Timeout)), false),
                             (
                                 Err(SessionError::Bluetooth(BleError::Platform("gatt".into()))),
-                                true,
+                                false,
                             ),
                             (Err(SessionError::Bluetooth(BleError::Cancelled)), false),
                             (Err(SessionError::Cancelled), false),
                             (
                                 Err(SessionError::Controller(ControllerError::Cancelled)),
-                                true,
+                                false,
                             ),
                             (
                                 Err(SessionError::Controller(ControllerError::Link(
                                     LinkError::Timeout,
+                                ))),
+                                false,
+                            ),
+                            (
+                                Err(SessionError::Controller(ControllerError::Link(
+                                    LinkError::Closed,
+                                ))),
+                                false,
+                            ),
+                            (
+                                Err(SessionError::Controller(ControllerError::Response(
+                                    ResponseError::Short(vec![1]),
+                                ))),
+                                true,
+                            ),
+                            (
+                                Err(SessionError::Controller(ControllerError::Random(
+                                    "no entropy".into(),
                                 ))),
                                 true,
                             ),
@@ -260,7 +284,9 @@ mod tests {
         let result = selection.settle(
             false,
             false,
-            Err(SessionError::Bluetooth(BleError::Platform("gatt".into()))),
+            Err(SessionError::Controller(ControllerError::Response(
+                ResponseError::Short(vec![1]),
+            ))),
         );
         assert!(matches!(result, Err(SessionError::Cache(_))));
     }
