@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/genbenbuxing/ns2proconbluetooth/compare/v0.4.0...v0.5.0) - 2026-11-03
+
+First release of this fork of [Cookiekira/ns2pro-bridge](https://github.com/Cookiekira/ns2pro-bridge), with Windows support verified on real hardware.
+
+### Added
+
+- Windows desktop app `ns2pro-bridge-gui.exe`: connect / disconnect / reconnect / forget controller, Bluetooth and usbip-win2 driver checks, tray icon, start with Windows, Chinese and English UI.
+- `app::run_until` and `app::check_bluetooth` for embedding the bridge; `usbip_win::driver_available`.
+
+### Fixed
+
+- Windows: accept usbip-win2's `number_of_packets = -1` on non-isochronous USB/IP submits; the virtual controller previously failed to enumerate.
+- Windows: cancel usbip-win2 re-attach attempts before attaching and after detaching (`STOP_ATTACH_ATTEMPTS`), and treat an already-released port as a clean detach.
+- Windows: shut down cleanly when the console window is closed, on logoff and on system shutdown.
+- A Bluetooth timeout (for example a sleeping controller) no longer forgets the cached controller.
+
 ## [0.4.0](https://github.com/Cookiekira/ns2pro-bridge/compare/v0.3.1...v0.4.0) - 2026-10-27
 
 ### Fixed
