@@ -38,12 +38,26 @@
 
 此外还需要一个支持蓝牙 LE、驱动正常的蓝牙适配器。
 
+## 图形界面（Windows）
+
+`ns2pro-bridge-gui.exe` 是给不熟悉命令行的用户准备的窗口程序，内部运行的是同一个桥接程序，另外提供：
+
+- **连接 / 断开 / 重新连接**按钮，实时显示状态（正在寻找手柄、已连接、正在重连），以及蓝牙连接间隔和输入频率。
+- **忘记手柄**：用于更换手柄，或配对出错后重新配对。
+- **环境检测**：检查蓝牙 LE 适配器和 usbip-win2 驱动；缺少驱动时给出 usbip-win2 官方下载页链接（程序本身不会下载或安装任何东西）。
+- **托盘图标**：可设置为关闭窗口后最小化到右下角托盘继续运行；托盘菜单可以显示窗口、连接、断开、退出。勾选**开机自动启动**后会在登录时最小化到托盘启动。
+- **中文 / English** 界面，默认跟随 Windows 系统语言。
+
+退出时（托盘菜单 → 退出，或在关闭托盘模式时直接关窗口）程序总会先断开手柄、拔出虚拟 USB 设备。同一时间只能运行一个实例，也不要和命令行版 `ns2pro-bridge.exe` 同时运行。设置保存在 `%LOCALAPPDATA%\ns2pro-bridge\gui-settings.json`。
+
 ## 在 Windows 上使用
 
 1. **安装 usbip-win2 驱动**：从 [usbip-win2 Releases](https://github.com/vadimgrn/usbip-win2/releases) 下载已签名的安装包（如 `USBip-0.9.8.1-x64.exe`）并安装。这是内核驱动，需要管理员权限。
 2. **获取程序**：从源码编译（推荐，见下方），或使用本仓库 Releases 中的 `ns2pro-bridge-x86_64-pc-windows-msvc.zip`（如有）。
-3. **运行** `ns2pro-bridge.exe`，首次连接时按下手柄顶部的**同步键（SYNC）**进行配对，程序会记住手柄。
+3. **运行** `ns2pro-bridge-gui.exe` 并点击**连接**（或在终端运行 `ns2pro-bridge.exe`），首次连接时按下手柄顶部的**同步键（SYNC）**进行配对，程序会记住手柄。
 4. 看到 `controller initialized; receiving input` 后打开 Steam 即可。下次使用时运行程序并按 **Home** 键唤醒手柄。按 **Ctrl+C** 退出。
+
+> ℹ️ **关于 Windows SmartScreen 提示。** 本程序**没有代码签名**。首次运行从网上下载的版本时，Windows 可能提示“Windows 已保护你的电脑”，点击**更多信息 → 仍要运行**即可。运行前可以把文件的 SHA-256 与发布页公布的值核对（PowerShell 中执行 `Get-FileHash .\ns2pro-bridge-gui.exe`）。本程序不需要管理员权限；只有 usbip-win2 驱动安装包（由其作者签名）会请求管理员权限。自己从源码编译则不会出现这个提示。
 
 > ⚠️ **不要在 Windows 设置里配对这个手柄。** 否则 Windows 会一直占用手柄的蓝牙连接，程序将扫描不到它。如果已经配对过，请先在"设置 → 蓝牙和设备"里删除该设备。
 
@@ -74,7 +88,7 @@ cargo build --locked --release -p ns2pro-bridge
 cargo test --locked --workspace
 ```
 
-输出：`target/release/ns2pro-bridge`（Windows 下为 `.exe`）。
+输出：`target/release/ns2pro-bridge`（Windows 下为 `.exe`）。图形界面（仅 Windows，需要 Rust 1.95+）：`cargo build --locked --release -p ns2pro-gui`，输出 `target/release/ns2pro-bridge-gui.exe`。
 
 ## 命令行选项
 

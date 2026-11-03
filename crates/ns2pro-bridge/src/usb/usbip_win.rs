@@ -186,6 +186,11 @@ fn open_driver() -> Result<OwnedHandle, AttachError> {
     .map_err(platform)
 }
 
+/// Whether a usbip-win2 driver is installed and its control device can be opened.
+#[must_use]
+pub fn driver_available() -> bool {
+    open_driver().is_ok()
+}
 /// Keep buffers, event and OVERLAPPED alive until Windows acknowledges completion,
 /// even on cancellation. `CancelIoEx` requests cancellation; it does not complete it.
 fn ioctl(

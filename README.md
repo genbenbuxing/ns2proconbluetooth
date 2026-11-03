@@ -38,12 +38,26 @@ Why: Windows only recognizes a controller that appears as a device on a USB bus,
 
 You also need a Bluetooth adapter with Bluetooth LE support and a working driver.
 
+## Desktop app (Windows)
+
+`ns2pro-bridge-gui.exe` is a window app for people who do not use the command line. It runs the same bridge and adds:
+
+- **Connect / Disconnect / Reconnect** buttons and a live status (looking for the controller, connected, reconnecting), with the Bluetooth interval and input rate.
+- **Forget controller**, to pair a different controller or recover from a failed pairing.
+- **System check** for the Bluetooth LE adapter and the usbip-win2 driver, with a link to the official usbip-win2 download page when it is missing (the app does not download or install anything itself).
+- **Tray icon**: closing the window keeps it running in the notification area (optional); the tray menu can show the window, connect, disconnect or quit. **Start with Windows** starts it minimized to the tray.
+- **Chinese / English** interface, following the Windows language by default.
+
+Quitting (tray menu → Quit, or closing the window with tray mode off) always releases the controller and unplugs the virtual USB device first. Only one copy of the app runs at a time; do not run it together with the command-line `ns2pro-bridge.exe`. Settings are stored in `%LOCALAPPDATA%\ns2pro-bridge\gui-settings.json`.
+
 ## Using it on Windows
 
 1. **Install the usbip-win2 driver**: download the signed installer (e.g. `USBip-0.9.8.1-x64.exe`) from [usbip-win2 Releases](https://github.com/vadimgrn/usbip-win2/releases) and install it. It is a kernel driver and needs administrator rights.
 2. **Get the program**: build from source (recommended, see below), or use `ns2pro-bridge-x86_64-pc-windows-msvc.zip` from this repository's Releases (if available).
-3. **Run** `ns2pro-bridge.exe`. On the first connection, press the **SYNC** button on top of the controller to pair; the program remembers the controller.
+3. **Run** `ns2pro-bridge-gui.exe` and click **Connect** (or run `ns2pro-bridge.exe` in a terminal). On the first connection, press the **SYNC** button on top of the controller to pair; the program remembers the controller.
 4. When `controller initialized; receiving input` appears, open Steam. Next time, run the program and press **Home** to wake the controller. Press **Ctrl+C** to exit.
+
+> ℹ️ **Windows SmartScreen warning.** The executables are **not code-signed**. When you run a downloaded copy for the first time, Windows may show "Windows protected your PC". Click **More info → Run anyway**. Before doing so, you can compare the file's SHA-256 with the value published in the release (`Get-FileHash .\ns2pro-bridge-gui.exe` in PowerShell). The app needs no administrator rights; only the usbip-win2 driver installer (which is signed by its author) asks for them. Building from source avoids the warning entirely.
 
 > ⚠️ **Do not pair the controller in Windows Settings.** Windows would then hold the controller's Bluetooth connection and the program could not find it. If you already paired it, remove it first under Settings → Bluetooth & devices.
 
@@ -74,7 +88,7 @@ cargo build --locked --release -p ns2pro-bridge
 cargo test --locked --workspace
 ```
 
-Output: `target/release/ns2pro-bridge` (`.exe` on Windows).
+Output: `target/release/ns2pro-bridge` (`.exe` on Windows). For the desktop app (Windows, Rust 1.95+): `cargo build --locked --release -p ns2pro-gui` produces `target/release/ns2pro-bridge-gui.exe`.
 
 ## Command-line options
 

@@ -1,0 +1,176 @@
+//! User-facing text in Simplified Chinese and English.
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Lang {
+    Zh,
+    En,
+}
+
+impl Lang {
+    /// Chinese when the Windows UI language is Chinese, English otherwise.
+    pub fn system() -> Self {
+        // SAFETY: GetUserDefaultUILanguage takes no arguments and cannot fail.
+        let lang = unsafe { windows::Win32::Globalization::GetUserDefaultUILanguage() };
+        // The low 10 bits are the primary language; 0x04 is LANG_CHINESE.
+        if lang & 0x3ff == 0x04 {
+            Self::Zh
+        } else {
+            Self::En
+        }
+    }
+
+    pub const fn text(self) -> &'static Text {
+        match self {
+            Self::Zh => &ZH,
+            Self::En => &EN,
+        }
+    }
+}
+
+pub struct Text {
+    pub title: &'static str,
+    pub status: &'static str,
+    pub idle: &'static str,
+    pub waiting_pair: &'static str,
+    pub waiting_wake: &'static str,
+    pub connected: &'static str,
+    pub reconnecting: &'static str,
+    pub stopping: &'static str,
+    pub failed: &'static str,
+    pub connect: &'static str,
+    pub disconnect: &'static str,
+    pub reconnect: &'static str,
+    pub forget: &'static str,
+    pub forget_confirm: &'static str,
+    pub forgotten: &'static str,
+    pub remembered: &'static str,
+    pub none_remembered: &'static str,
+    pub interval: &'static str,
+    pub report_rate: &'static str,
+    pub virtual_usb: &'static str,
+    pub attached: &'static str,
+    pub not_attached: &'static str,
+    pub checks: &'static str,
+    pub recheck: &'static str,
+    pub bluetooth: &'static str,
+    pub driver: &'static str,
+    pub ok: &'static str,
+    pub missing: &'static str,
+    pub checking: &'static str,
+    pub bt_missing: &'static str,
+    pub open_bt_settings: &'static str,
+    pub driver_missing: &'static str,
+    pub download_driver: &'static str,
+    pub settings: &'static str,
+    pub language: &'static str,
+    pub auto_connect: &'static str,
+    pub autostart: &'static str,
+    pub close_to_tray: &'static str,
+    pub log: &'static str,
+    pub hint_pair: &'static str,
+    pub hint_wake: &'static str,
+    pub hint_no_settings_pair: &'static str,
+    pub tray_show: &'static str,
+    pub tray_quit: &'static str,
+    pub already_running: &'static str,
+    pub cancel: &'static str,
+}
+
+const ZH: Text = Text {
+    title: "NS2 Pro 手柄蓝牙连接",
+    status: "状态",
+    idle: "未连接",
+    waiting_pair: "等待配对",
+    waiting_wake: "正在寻找手柄",
+    connected: "已连接",
+    reconnecting: "连接中断，正在重连…",
+    stopping: "正在断开…",
+    failed: "已停止（出错）",
+    connect: "连接",
+    disconnect: "断开",
+    reconnect: "重新连接",
+    forget: "忘记手柄",
+    forget_confirm: "确定忘记已记住的手柄吗？下次连接需要重新按同步键配对。",
+    forgotten: "已忘记手柄，下次连接需要重新配对。",
+    remembered: "已记住的手柄",
+    none_remembered: "无（首次连接需要配对）",
+    interval: "蓝牙连接间隔",
+    report_rate: "输入频率",
+    virtual_usb: "虚拟 USB 手柄",
+    attached: "已挂载",
+    not_attached: "未挂载",
+    checks: "环境检测",
+    recheck: "重新检测",
+    bluetooth: "蓝牙适配器",
+    driver: "usbip-win2 驱动",
+    ok: "正常",
+    missing: "缺失",
+    checking: "检测中…",
+    bt_missing: "未找到可用的蓝牙 LE 适配器，请确认蓝牙已开启且驱动正常。",
+    open_bt_settings: "打开蓝牙设置",
+    driver_missing: "未安装 usbip-win2 驱动。它是一个已签名的内核驱动，用来让 Windows 看到虚拟的有线手柄，需要单独安装（需要管理员权限）。",
+    download_driver: "前往 usbip-win2 官方下载页",
+    settings: "设置",
+    language: "语言 / Language",
+    auto_connect: "启动后自动连接",
+    autostart: "开机自动启动（最小化到托盘）",
+    close_to_tray: "关闭窗口时最小化到托盘",
+    log: "运行日志",
+    hint_pair: "首次连接：按住手柄顶部的同步键（SYNC），直到指示灯闪烁。",
+    hint_wake: "按手柄的 Home 键唤醒，程序会自动连接已记住的手柄。",
+    hint_no_settings_pair: "请不要在 Windows 设置里配对这个手柄，否则程序会找不到它。",
+    tray_show: "显示窗口",
+    tray_quit: "退出",
+    already_running: "NS2 Pro 手柄蓝牙连接已在运行，请在任务栏右下角的托盘图标中打开。",
+    cancel: "取消",
+};
+
+const EN: Text = Text {
+    title: "NS2 Pro Controller Bluetooth Bridge",
+    status: "Status",
+    idle: "Not connected",
+    waiting_pair: "Waiting to pair",
+    waiting_wake: "Looking for the controller",
+    connected: "Connected",
+    reconnecting: "Connection lost, reconnecting…",
+    stopping: "Disconnecting…",
+    failed: "Stopped (error)",
+    connect: "Connect",
+    disconnect: "Disconnect",
+    reconnect: "Reconnect",
+    forget: "Forget controller",
+    forget_confirm: "Forget the remembered controller? You will need to press SYNC to pair again.",
+    forgotten: "Controller forgotten; the next connection will pair again.",
+    remembered: "Remembered controller",
+    none_remembered: "None (first connection pairs)",
+    interval: "Bluetooth interval",
+    report_rate: "Input rate",
+    virtual_usb: "Virtual USB controller",
+    attached: "Attached",
+    not_attached: "Not attached",
+    checks: "System check",
+    recheck: "Check again",
+    bluetooth: "Bluetooth adapter",
+    driver: "usbip-win2 driver",
+    ok: "OK",
+    missing: "Missing",
+    checking: "Checking…",
+    bt_missing: "No usable Bluetooth LE adapter found. Make sure Bluetooth is on and its driver works.",
+    open_bt_settings: "Open Bluetooth settings",
+    driver_missing: "The usbip-win2 driver is not installed. This signed kernel driver lets Windows see the virtual wired controller and must be installed separately (administrator rights required).",
+    download_driver: "Open the official usbip-win2 download page",
+    settings: "Settings",
+    language: "语言 / Language",
+    auto_connect: "Connect automatically on launch",
+    autostart: "Start with Windows (minimized to tray)",
+    close_to_tray: "Minimize to tray when the window is closed",
+    log: "Log",
+    hint_pair: "First connection: hold the SYNC button on top of the controller until the lights flash.",
+    hint_wake: "Press Home on the controller to wake it; the app reconnects to the remembered controller.",
+    hint_no_settings_pair: "Do not pair this controller in Windows Settings, or the app will not find it.",
+    tray_show: "Show window",
+    tray_quit: "Quit",
+    already_running: "NS2 Pro Controller Bluetooth Bridge is already running. Open it from the tray icon.",
+    cancel: "Cancel",
+};

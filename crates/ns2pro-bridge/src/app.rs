@@ -66,8 +66,8 @@ async fn run_session<B: crate::ble::Bluetooth>(
     usb: usb::Attachment,
     cancel: CancellationToken,
     channels: Channels,
+    shutdown: impl Future<Output = ()>,
 ) -> Result<(), AppError> {
-    let shutdown = platform::shutdown().map_err(|e| AppError::Platform(e.to_string()))?;
     let stop = async {
         tokio::select! {
             () = cancel.cancelled() => {},
@@ -86,13 +86,25 @@ async fn run_session<B: crate::ble::Bluetooth>(
     };
     usb.run(&channels, &cancel, drain).await
 }
-/// Runs the bridge until shutdown is requested or a component fails.
+/// Runs the bridge until a console or OS shutdown signal arrives or a component fails.
 ///
 /// # Errors
 ///
 /// The first [`AppError`] from platform setup, Bluetooth, USB attachment or the
 /// session; a clean shutdown returns `Ok`.
 pub async fn run(options: Options) -> Result<(), AppError> {
+    let shutdown = platform::shutdown().map_err(|e| AppError::Platform(e.to_string()))?;
+    run_until(options, shutdown).await
+}
+/// Runs the bridge until `stop` completes or a component fails.
+///
+/// The controller and the virtual USB device are released before it returns.
+/// Embedders such as a GUI use this instead of [`run`] to stop on their own events.
+///
+/// # Errors
+///
+/// As for [`run`].
+pub async fn run_until(options: Options, stop: impl Future<Output = ()>) -> Result<(), AppError> {
     let (_guard, bluetooth) = platform::initialize().await?;
     let result = async {
         if options.bt_smoke_test {
@@ -104,11 +116,25 @@ pub async fn run(options: Options) -> Result<(), AppError> {
         let channels = Channels::default();
         let cancel = CancellationToken::new();
         let usb = usb::Attachment::prepare(&options).await?;
-        Box::pin(run_session(&bluetooth, &options, usb, cancel, channels)).await
+        Box::pin(run_session(
+            &bluetooth, &options, usb, cancel, channels, stop,
+        ))
+        .await
     }
     .await;
     platform::close(&bluetooth).await;
     result
+}
+/// Checks that the platform Bluetooth adapter is present and supports Bluetooth LE,
+/// without scanning or connecting.
+///
+/// # Errors
+///
+/// [`AppError::Bluetooth`] or [`AppError::Platform`] when the adapter is unusable.
+pub async fn check_bluetooth() -> Result<(), AppError> {
+    let (_guard, bluetooth) = platform::initialize().await?;
+    platform::close(&bluetooth).await;
+    Ok(())
 }
 
 #[cfg(target_os = "linux")]
@@ -144,13 +170,21 @@ mod platform {
 mod platform {
     use super::AppError;
     use crate::{ble::windows::WindowsBluetooth, rt::windows::RuntimeGuard};
-    #[expect(
-        clippy::unnecessary_wraps,
-        reason = "signature shared with the Linux platform module"
-    )]
+    /// Ctrl+C, closing the console window, logoff and system shutdown. Windows allows
+    /// a few seconds after close/logoff/shutdown, enough to unplug the virtual device.
     pub(super) fn shutdown() -> std::io::Result<impl Future<Output = ()>> {
-        Ok(async {
-            let _ = tokio::signal::ctrl_c().await;
+        use tokio::signal::windows::{ctrl_c, ctrl_close, ctrl_logoff, ctrl_shutdown};
+        let mut interrupt = ctrl_c()?;
+        let mut close = ctrl_close()?;
+        let mut logoff = ctrl_logoff()?;
+        let mut system = ctrl_shutdown()?;
+        Ok(async move {
+            tokio::select! {
+                _ = interrupt.recv() => {},
+                _ = close.recv() => {},
+                _ = logoff.recv() => {},
+                _ = system.recv() => {},
+            }
         })
     }
 
