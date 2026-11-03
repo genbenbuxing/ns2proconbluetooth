@@ -18,8 +18,10 @@
 | usbip-win2 驱动接口（IOCTL、结构体布局）对照驱动源码核对 | ✅ 一致 |
 | USB/IP 协议对照驱动源码核对 | ✅ 已修复不兼容处（见下） |
 | 安全审计（网络、文件、进程、依赖、发布流程） | ✅ 未发现恶意行为 |
-| 真实手柄 + 真实蓝牙适配器 + usbip-win2 实机测试 | ⏳ 进行中 |
-| Windows 下蓝牙连接间隔（输入延迟） | ⏳ 需实机测量，见[延迟](#延迟) |
+| 真实手柄 + 真实蓝牙适配器 + usbip-win2 实机测试 | ✅ 通过（2026-11-03）：配对、挂载、输入均正常 |
+| Windows 下蓝牙连接间隔（输入延迟） | ✅ 已实测：20 ms，见[延迟](#延迟) |
+
+**测试硬件：** Windows 11 Pro x64（build 26300），技嘉 B850M FORCE WIFI6E 板载 MediaTek MT7902 Wi-Fi 6E / 蓝牙（驱动 1.1146.0.585），usbip-win2 v0.9.8.1，Nintendo Switch 2 Pro 手柄。
 
 ## 相对上游的修改
 
@@ -28,9 +30,17 @@
 3. **修复：手柄休眠后被"忘记"。** 上游在扫描超时（例如手柄休眠超过 30 秒）时也会清除已记住的手柄，下次连接会重新配对、且不再限定地址。现在蓝牙超时不再清除缓存，只有真正的连接错误才会。（`crates/ns2pro-bridge/src/cache.rs`）
 4. 移除只适用于上游仓库的 release-plz 发布流程，仓库地址改为本仓库。
 
+## 依赖（Windows）
+
+本程序**需要另外安装一个驱动**：**[usbip-win2](https://github.com/vadimgrn/usbip-win2)**（GPL-3.0，作者 vadimgrn），支持 v0.9.6.1–v0.9.8.1。
+
+原因：Windows 只认"插在 USB 总线上的设备"，普通程序无法凭空创建 USB 设备。usbip-win2 是一个已签名的内核驱动，会在系统里添加一个虚拟 USB 主控制器（设备管理器中显示为 "USBip 3.X Emulated Host Controller"）。本程序通过蓝牙连接手柄，再经 USB/IP 协议把一个虚拟的有线 Switch 2 Pro 手柄"插"进这个虚拟 USB 口，Windows 和 Steam 就会看到一个有线手柄。本项目不附带、也不修改 usbip-win2。
+
+此外还需要一个支持蓝牙 LE、驱动正常的蓝牙适配器。
+
 ## 在 Windows 上使用
 
-1. **安装 usbip-win2 驱动**：从 [usbip-win2 Releases](https://github.com/vadimgrn/usbip-win2/releases) 下载并安装已签名的版本（支持 v0.9.6.1–v0.9.8.1）。这是内核驱动，需要管理员权限，请自行确认来源后安装。
+1. **安装 usbip-win2 驱动**：从 [usbip-win2 Releases](https://github.com/vadimgrn/usbip-win2/releases) 下载已签名的安装包（如 `USBip-0.9.8.1-x64.exe`）并安装。这是内核驱动，需要管理员权限。
 2. **获取程序**：从源码编译（推荐，见下方），或使用本仓库 Releases 中的 `ns2pro-bridge-x86_64-pc-windows-msvc.zip`（如有）。
 3. **运行** `ns2pro-bridge.exe`，首次连接时按下手柄顶部的**同步键（SYNC）**进行配对，程序会记住手柄。
 4. 看到 `controller initialized; receiving input` 后打开 Steam 即可。下次使用时运行程序并按 **Home** 键唤醒手柄。按 **Ctrl+C** 退出。
@@ -47,7 +57,9 @@ Linux 下程序可以把蓝牙连接间隔设为 7.5 ms；Windows 不允许普�
 Observed BLE connection interval  interval_units_1_25_ms=N
 ```
 
-N 的单位是 1.25 ms：6 = 7.5 ms（理想），12 = 15 ms（良好），24 及以上 = 30 ms 以上（可能感觉到延迟）。加 `--log-level debug` 每 5 秒还会输出报告频率和延迟 p50/p99。如果延迟不理想，可以改用 USB-C 有线连接。
+N 的单位是 1.25 ms：6 = 7.5 ms（理想），12 = 15 ms（良好），24 及以上 = 30 ms 以上（可能感觉到延迟）。
+
+**上述测试硬件的实测结果：** N = 16（连接间隔 **20 ms**，Windows 接受了吞吐量优先请求），输入上报平均约每 15.7 ms 一次（约 64 Hz），程序自身增加约 0.08 ms（p50）/ 0.15 ms（p99）。大多数游戏没有问题；格斗、音游、竞技射击可能感觉比有线稍慢。实际结果取决于你的蓝牙适配器和驱动。加 `--log-level debug` 每 5 秒还会输出报告频率和延迟 p50/p99。如果延迟不理想，可以改用 USB-C 有线连接。
 
 ## 在 Linux 上使用
 

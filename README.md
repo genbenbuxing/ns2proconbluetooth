@@ -18,8 +18,10 @@ Upstream was only tested on real hardware under Linux; Windows was only built in
 | usbip-win2 driver interface (IOCTLs, struct layouts) checked against driver source | ✅ Matches |
 | USB/IP protocol checked against driver source | ✅ Incompatibilities fixed (see below) |
 | Security audit (network, files, processes, dependencies, release pipeline) | ✅ No malicious behavior found |
-| Real controller + real Bluetooth adapter + usbip-win2 hardware test | ⏳ In progress |
-| Bluetooth connection interval on Windows (input latency) | ⏳ Needs measurement on hardware, see [Latency](#latency) |
+| Real controller + real Bluetooth adapter + usbip-win2 hardware test | ✅ Passing (2026-11-03): pairs, attaches, input received |
+| Bluetooth connection interval on Windows (input latency) | ✅ Measured: 20 ms interval, see [Latency](#latency) |
+
+**Tested hardware:** Windows 11 Pro x64 (build 26300), Gigabyte B850M FORCE WIFI6E with its onboard MediaTek MT7902 Wi-Fi 6E / Bluetooth (driver 1.1146.0.585), usbip-win2 v0.9.8.1, Nintendo Switch 2 Pro Controller.
 
 ## Changes from upstream
 
@@ -28,9 +30,17 @@ Upstream was only tested on real hardware under Linux; Windows was only built in
 3. **Fix: controller forgotten after it sleeps.** Upstream also cleared the remembered controller on a scan timeout (e.g. when the controller slept for more than 30 s), so the next connection re-paired and no longer filtered by address. A Bluetooth timeout no longer clears the cache; only real connection errors do. (`crates/ns2pro-bridge/src/cache.rs`)
 4. Removed the release-plz pipeline that only applied to the upstream repository, and pointed the repository URL at this repo.
 
+## Requirements (Windows)
+
+This program **requires a separately installed driver**: **[usbip-win2](https://github.com/vadimgrn/usbip-win2)** (GPL-3.0, by vadimgrn), versions v0.9.6.1–v0.9.8.1.
+
+Why: Windows only recognizes a controller that appears as a device on a USB bus, and a normal program cannot create one. usbip-win2 is a signed kernel driver that adds a virtual USB host controller ("USBip 3.X Emulated Host Controller" in Device Manager). This program connects to the controller over Bluetooth and plugs a virtual wired Switch 2 Pro Controller into that virtual USB port over the USB/IP protocol, so Windows and Steam see a wired controller. This project does not bundle or modify usbip-win2.
+
+You also need a Bluetooth adapter with Bluetooth LE support and a working driver.
+
 ## Using it on Windows
 
-1. **Install the usbip-win2 driver**: download and install a signed release from [usbip-win2 Releases](https://github.com/vadimgrn/usbip-win2/releases) (v0.9.6.1–v0.9.8.1 supported). It is a kernel driver and needs administrator rights; verify the source yourself before installing.
+1. **Install the usbip-win2 driver**: download the signed installer (e.g. `USBip-0.9.8.1-x64.exe`) from [usbip-win2 Releases](https://github.com/vadimgrn/usbip-win2/releases) and install it. It is a kernel driver and needs administrator rights.
 2. **Get the program**: build from source (recommended, see below), or use `ns2pro-bridge-x86_64-pc-windows-msvc.zip` from this repository's Releases (if available).
 3. **Run** `ns2pro-bridge.exe`. On the first connection, press the **SYNC** button on top of the controller to pair; the program remembers the controller.
 4. When `controller initialized; receiving input` appears, open Steam. Next time, run the program and press **Home** to wake the controller. Press **Ctrl+C** to exit.
@@ -47,7 +57,9 @@ On Linux the program sets the Bluetooth connection interval to 7.5 ms. Windows d
 Observed BLE connection interval  interval_units_1_25_ms=N
 ```
 
-N is in units of 1.25 ms: 6 = 7.5 ms (ideal), 12 = 15 ms (good), 24 or more = 30 ms+ (latency may be noticeable). With `--log-level debug` it also prints the report rate and latency p50/p99 every 5 seconds. If latency is not acceptable, use a wired USB-C connection instead.
+N is in units of 1.25 ms: 6 = 7.5 ms (ideal), 12 = 15 ms (good), 24 or more = 30 ms+ (latency may be noticeable).
+
+**Measured on the tested hardware above:** N = 16 (**20 ms** interval; Windows accepted the throughput-optimized request), input reports every ~15.7 ms on average (~64 Hz), and the bridge itself adds ~0.08 ms (p50) / ~0.15 ms (p99). Fine for most games; fighting, rhythm and competitive shooting games may feel slightly slower than wired. Results depend on your Bluetooth adapter and driver. With `--log-level debug` it also prints the report rate and latency p50/p99 every 5 seconds. If latency is not acceptable, use a wired USB-C connection instead.
 
 ## Using it on Linux
 
