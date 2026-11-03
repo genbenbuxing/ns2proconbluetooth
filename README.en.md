@@ -1,0 +1,88 @@
+# ns2proconbluetooth — Switch 2 Pro Controller on PC over Bluetooth (Windows / Linux)
+
+[简体中文](README.md) | **English**
+
+Connect a **Nintendo Switch 2 Pro Controller to a PC over Bluetooth LE**. The program presents the wireless controller as a wired USB Switch 2 Pro Controller (USB `057e:2069`), so Steam and SDL recognize it as a regular wired Nintendo controller.
+
+## Attribution
+
+This project is a modified version of **[Cookiekira/ns2pro-bridge](https://github.com/Cookiekira/ns2pro-bridge)** (v0.4.0, GPL-3.0-or-later). The full upstream commit history and authorship are preserved. Thanks to the original author Harvey (Cookiekira) and to the projects it builds on: [VIIPER](https://github.com/Alia5/VIIPER), [switch2_controller_research](https://github.com/ndeadly/switch2_controller_research) and [usbip-win2](https://github.com/vadimgrn/usbip-win2).
+
+Upstream was only tested on real hardware under Linux; Windows was only built in CI. Building on it, we **optimized the program and verified and fixed Windows support**: the Windows driver interface, USB/IP protocol and Bluetooth path were checked item by item against the usbip-win2 driver source (v0.9.6.1–v0.9.8.1), the issues that prevented it from working on Windows were fixed, and it was built from source and passes the full test suite on Windows 11.
+
+### Windows support status
+
+| Item | Status |
+| --- | --- |
+| Build from source on Windows 11 x64 + all unit/integration tests | ✅ Passing |
+| usbip-win2 driver interface (IOCTLs, struct layouts) checked against driver source | ✅ Matches |
+| USB/IP protocol checked against driver source | ✅ Incompatibilities fixed (see below) |
+| Security audit (network, files, processes, dependencies, release pipeline) | ✅ No malicious behavior found |
+| Real controller + real Bluetooth adapter + usbip-win2 hardware test | ⏳ In progress |
+| Bluetooth connection interval on Windows (input latency) | ⏳ Needs measurement on hardware, see [Latency](#latency) |
+
+## Changes from upstream
+
+1. **Fix: virtual controller fails to enumerate on Windows (critical).** usbip-win2 sends `number_of_packets = -1` for non-isochronous transfers (see `number_of_packets_non_isoch` in the driver's `usbip/proto.h`). Upstream only accepted the `0` sent by Linux vhci, so the very first USB request from Windows (reading the device descriptor) was rejected and the connection dropped. Both values are now accepted. (`crates/ns2pro-usb/src/usbip.rs`)
+2. **Fix: driver keeps re-attaching after exit.** Since v0.9.7.7, usbip-win2 automatically retries an import for up to about 2 hours after its connection drops. Upstream closed the connection before unplugging the device on exit, which triggered this, and restarting the program could produce two controllers. The bridge now calls `STOP_ATTACH_ATTEMPTS` before attaching and after detaching to cancel the driver's retries, and treats "device already unplugged by the driver" as a clean exit. (`crates/ns2pro-usb/src/usbip_win.rs`, `crates/ns2pro-bridge/src/usb/usbip_win.rs`)
+3. **Fix: controller forgotten after it sleeps.** Upstream also cleared the remembered controller on a scan timeout (e.g. when the controller slept for more than 30 s), so the next connection re-paired and no longer filtered by address. A Bluetooth timeout no longer clears the cache; only real connection errors do. (`crates/ns2pro-bridge/src/cache.rs`)
+4. Removed the release-plz pipeline that only applied to the upstream repository, and pointed the repository URL at this repo.
+
+## Using it on Windows
+
+1. **Install the usbip-win2 driver**: download and install a signed release from [usbip-win2 Releases](https://github.com/vadimgrn/usbip-win2/releases) (v0.9.6.1–v0.9.8.1 supported). It is a kernel driver and needs administrator rights; verify the source yourself before installing.
+2. **Get the program**: build from source (recommended, see below), or use `ns2pro-bridge-x86_64-pc-windows-msvc.zip` from this repository's Releases (if available).
+3. **Run** `ns2pro-bridge.exe`. On the first connection, press the **SYNC** button on top of the controller to pair; the program remembers the controller.
+4. When `controller initialized; receiving input` appears, open Steam. Next time, run the program and press **Home** to wake the controller. Press **Ctrl+C** to exit.
+
+> ⚠️ **Do not pair the controller in Windows Settings.** Windows would then hold the controller's Bluetooth connection and the program could not find it. If you already paired it, remove it first under Settings → Bluetooth & devices.
+
+You can run `ns2pro-bridge.exe --bt-smoke-test` first to check that your Bluetooth adapter can scan.
+
+### Latency
+
+On Linux the program sets the Bluetooth connection interval to 7.5 ms. Windows does not let a normal program force the interval; it can only request "throughput optimized", and the actual value is decided by Windows, the Bluetooth driver and the controller together. The program logs the actual interval on every connection:
+
+```
+Observed BLE connection interval  interval_units_1_25_ms=N
+```
+
+N is in units of 1.25 ms: 6 = 7.5 ms (ideal), 12 = 15 ms (good), 24 or more = 30 ms+ (latency may be noticeable). With `--log-level debug` it also prints the report rate and latency p50/p99 every 5 seconds. If latency is not acceptable, use a wired USB-C connection instead.
+
+## Using it on Linux
+
+Run `ns2pro-bridge` and enter your password when asked (the program elevates via `sudo`/`pkexec` and loads `vhci-hcd` automatically), then press SYNC on first connection. Linux binaries require glibc ≥ 2.39. If 32-bit Steam sees the controller but gets no input, install 32-bit libusb (e.g. `lib32-libusb` on Arch) and restart Steam.
+
+## Building from source
+
+Requires Rust (`rust-toolchain.toml` installs the pinned version automatically); on Windows you also need the C++ tools from Visual Studio Build Tools.
+
+```sh
+cargo build --locked --release -p ns2pro-bridge
+cargo test --locked --workspace
+```
+
+Output: `target/release/ns2pro-bridge` (`.exe` on Windows).
+
+## Command-line options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--forget-device` | off | Forget the saved controller and pair again |
+| `--device-address MAC` | cached | Connect to the controller at this address |
+| `--no-auto-attach` | off | Only serve USB/IP; do not attach locally |
+| `--usb-addr HOST:PORT` | `localhost:3241` | USB/IP server address |
+| `--log-level LEVEL` | `info` | `trace`/`debug`/`info`/`warn`/`error`/`off`; `RUST_LOG` takes precedence |
+| `--pair-host` | off | Re-pair the host once per run |
+| `--host-address MAC` | adapter address | Host address used for pairing |
+| `--cache-file PATH` | Windows: `%LOCALAPPDATA%\ns2pro-bridge\controller-cache.json`; Linux: `/var/lib/ns2pro-bridge/controller-cache.json` | Where the controller address is saved |
+| `--feature-flags FLAGS` | `0x07` | Button, stick and IMU feature flags |
+| `--bt-smoke-test` | off | Only check the Bluetooth adapter and scanning |
+
+> 🔒 The USB/IP server has **no authentication**. By default it only listens on loopback. Do not set `--usb-addr` to `0.0.0.0` or another external address, or anyone on your LAN could read controller input and drive rumble and LEDs.
+
+## License
+
+This project keeps upstream's **GPL-3.0-or-later** (see [LICENSE.txt](LICENSE.txt)). Because the code derives from GPL-licensed ns2pro-bridge and VIIPER (GPL-3.0, see [LICENSES/VIIPER-GPL-3.0.txt](LICENSES/VIIPER-GPL-3.0.txt)), modified versions must be released under the same or a compatible GPL license and cannot be relicensed under permissive licenses such as MIT. Third-party sources and the modification notice are in [THIRD_PARTY.md](THIRD_PARTY.md).
+
+This project is not affiliated with Nintendo. Nintendo Switch is a trademark of Nintendo.

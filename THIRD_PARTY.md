@@ -21,6 +21,6 @@ This repository ([genbenbuxing/ns2proconbluetooth](https://github.com/genbenbuxi
 is a modified version of [Cookiekira/ns2pro-bridge](https://github.com/Cookiekira/ns2pro-bridge)
 v0.4.0 (commit `ef67f5b`), by Harvey (Cookiekira) and contributors, under GPL-3.0-or-later.
 The full upstream history is preserved in this repository. Changes made here, starting
-2026-11-03, are listed in [README.md](README.md#相对上游的修改) and in the git log.
+2026-11-03, are listed in [README.md](README.md#相对上游的修改) ([English](README.en.md#changes-from-upstream)) and in the git log.
 
 This project is GPL-3.0-or-later; see [LICENSE.txt](LICENSE.txt).

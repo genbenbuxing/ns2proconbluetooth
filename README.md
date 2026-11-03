@@ -1,8 +1,8 @@
 # ns2proconbluetooth — Switch 2 Pro 手柄蓝牙连接 PC（Windows / Linux）
 
-让 **Nintendo Switch 2 Pro 手柄通过蓝牙 BLE 无线连接电脑**。程序把无线手柄模拟成一个有线 USB Switch 2 Pro 手柄（USB `057e:2069`），Steam 和 SDL 会把它当作普通的任天堂有线手柄识别。
+**简体中文** | [English](README.en.md)
 
-[English summary](#english-summary)
+让 **Nintendo Switch 2 Pro 手柄通过蓝牙 BLE 无线连接电脑**。程序把无线手柄模拟成一个有线 USB Switch 2 Pro 手柄（USB `057e:2069`），Steam 和 SDL 会把它当作普通的任天堂有线手柄识别。
 
 ## 来源声明
 
@@ -87,14 +87,3 @@ cargo test --locked --workspace
 
 本项目与任天堂无关。Nintendo Switch 是任天堂的商标。
 
----
-
-## English summary
-
-A fork of [Cookiekira/ns2pro-bridge](https://github.com/Cookiekira/ns2pro-bridge) (GPL-3.0-or-later) that connects a Nintendo Switch 2 Pro Controller to a PC over Bluetooth LE and exposes it as a wired USB controller for Steam/SDL. Upstream was only tested on Linux; this fork reviewed the Windows path against the usbip-win2 driver source and fixed:
-
-1. USB/IP submits from usbip-win2 carry `number_of_packets = -1` for non-isochronous transfers; upstream rejected them, so enumeration failed on Windows.
-2. usbip-win2 ≥ 0.9.7.7 re-attaches for hours after the connection drops; the bridge now cancels those attempts (`STOP_ATTACH_ATTEMPTS`) before attaching and after detaching.
-3. A Bluetooth timeout (e.g. sleeping controller) no longer forgets the cached controller.
-
-Builds and passes all tests on Windows 11 x64. Real-hardware testing on Windows is in progress. Do not pair the controller in Windows Bluetooth settings. License: GPL-3.0-or-later.
