@@ -29,8 +29,15 @@ pub const STRING_2: &[u8] = &[
     48, 3, 83, 0, 119, 0, 105, 0, 116, 0, 99, 0, 104, 0, 32, 0, 50, 0, 32, 0, 80, 0, 114, 0, 111,
     0, 32, 0, 67, 0, 111, 0, 110, 0, 116, 0, 114, 0, 111, 0, 108, 0, 108, 0, 101, 0, 114, 0,
 ];
-/// String descriptor 3: "00" (serial number).
-pub const STRING_3: &[u8] = &[6, 3, 48, 0, 48, 0];
+/// String descriptor 3: "NS2BRIDGE" (serial number).
+///
+/// VIIPER, and real controllers, report "00". Windows names USB devices that have a
+/// serial number after VID, PID and serial, so the same serial made the virtual and a
+/// cable-connected controller share one device node, and a controller plugged in while
+/// the virtual one was attached got a location-based node that Steam failed to open.
+pub const STRING_3: &[u8] = &[
+    20, 3, 78, 0, 83, 0, 50, 0, 66, 0, 82, 0, 73, 0, 68, 0, 71, 0, 69, 0,
+];
 /// String descriptor 4: "Nintendo Switch 2 Pro Controller".
 pub const STRING_4: &[u8] = &[
     66, 3, 78, 0, 105, 0, 110, 0, 116, 0, 101, 0, 110, 0, 100, 0, 111, 0, 32, 0, 83, 0, 119, 0,

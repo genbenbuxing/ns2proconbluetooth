@@ -64,6 +64,8 @@ pub struct Bridge {
     wired: AtomicBool,
     /// The bridge was stopped because of the cable and resumes when it is unplugged.
     paused_for_wire: AtomicBool,
+    /// Passed to the bridge as `--keep-leds-lit` on the next connection.
+    keep_leds_lit: AtomicBool,
 }
 
 struct Run {
@@ -85,6 +87,7 @@ impl Bridge {
             repaint: Mutex::new(None),
             wired: AtomicBool::new(false),
             paused_for_wire: AtomicBool::new(false),
+            keep_leds_lit: AtomicBool::new(false),
         })
     }
 
@@ -107,6 +110,11 @@ impl Bridge {
         lock(&self.run)
             .as_ref()
             .is_some_and(|run| !run.thread.is_finished())
+    }
+
+    /// Takes effect from the next connection.
+    pub fn set_keep_leds_lit(&self, keep: bool) {
+        self.keep_leds_lit.store(keep, Ordering::Relaxed);
     }
 
     pub fn wired(&self) -> bool {
@@ -169,8 +177,9 @@ impl Bridge {
         let stop = CancellationToken::new();
         let bridge = Arc::clone(self);
         let thread_stop = stop.clone();
+        let keep_leds_lit = self.keep_leds_lit.load(Ordering::Relaxed);
         let thread = std::thread::spawn(move || {
-            let result = run_bridge(thread_stop);
+            let result = run_bridge(thread_stop, keep_leds_lit);
             {
                 let mut status = bridge.status();
                 status.usb_attached = false;
@@ -259,8 +268,9 @@ impl Bridge {
     }
 }
 
-fn run_bridge(stop: CancellationToken) -> Result<(), String> {
-    let options = default_options();
+fn run_bridge(stop: CancellationToken, keep_leds_lit: bool) -> Result<(), String> {
+    let mut options = default_options();
+    options.keep_leds_lit = keep_leds_lit;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

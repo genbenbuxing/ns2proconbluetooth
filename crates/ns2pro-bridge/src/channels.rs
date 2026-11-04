@@ -45,6 +45,9 @@ pub struct Channels {
     pub identity: watch::Sender<Identity>,
     /// Shared latency and throughput statistics.
     pub stats: Arc<Mutex<Statistics>>,
+    /// Replace a host request to turn every player LED off with the default pattern,
+    /// so a connected controller always shows a lit indicator.
+    pub keep_leds_lit: bool,
 }
 impl Default for Channels {
     fn default() -> Self {
@@ -54,6 +57,7 @@ impl Default for Channels {
             rumble: watch::channel(None).0,
             identity: watch::channel(Identity::Pending).0,
             stats: Arc::new(Mutex::new(Statistics::default())),
+            keep_leds_lit: false,
         }
     }
 }
@@ -62,6 +66,11 @@ impl Channels {
     pub fn output(&self, output: Output) {
         match output {
             Output::PlayerLeds(v) => {
+                let v = if v == 0 && self.keep_leds_lit {
+                    ns2pro_proto::command::DEFAULT_LED_PATTERN
+                } else {
+                    v
+                };
                 self.leds.send_replace(v);
             }
             Output::Rumble { left, right } => {
@@ -77,5 +86,30 @@ impl Channels {
             s.motion_timestamp_us = 0;
         });
         self.rumble.send_replace(None);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ns2pro_proto::command::DEFAULT_LED_PATTERN;
+
+    #[test]
+    fn keep_leds_lit_replaces_only_an_all_off_request() {
+        let passthrough = Channels::default();
+        let kept = Channels {
+            keep_leds_lit: true,
+            ..Channels::default()
+        };
+        for (request, plain, lit) in [
+            (0, 0, DEFAULT_LED_PATTERN),
+            (0x01, 0x01, 0x01),
+            (0x0f, 0x0f, 0x0f),
+        ] {
+            passthrough.output(Output::PlayerLeds(request));
+            kept.output(Output::PlayerLeds(request));
+            assert_eq!(*passthrough.leds.borrow(), plain);
+            assert_eq!(*kept.leds.borrow(), lit);
+        }
     }
 }

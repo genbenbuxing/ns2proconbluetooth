@@ -113,7 +113,10 @@ pub async fn run_until(options: Options, stop: impl Future<Output = ()>) -> Resu
                 .await
                 .map_err(AppError::from);
         }
-        let channels = Channels::default();
+        let channels = Channels {
+            keep_leds_lit: options.keep_leds_lit,
+            ..Channels::default()
+        };
         let cancel = CancellationToken::new();
         let usb = usb::Attachment::prepare(&options).await?;
         Box::pin(run_session(

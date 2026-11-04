@@ -9,6 +9,8 @@ pub struct Settings {
     /// `None` follows the Windows UI language.
     pub lang: Option<Lang>,
     pub auto_connect: bool,
+    /// Keep the controller's player LEDs lit while connected.
+    pub keep_leds_lit: bool,
     pub close_to_tray: bool,
 }
 
@@ -17,6 +19,7 @@ impl Default for Settings {
         Self {
             lang: None,
             auto_connect: true,
+            keep_leds_lit: true,
             close_to_tray: true,
         }
     }

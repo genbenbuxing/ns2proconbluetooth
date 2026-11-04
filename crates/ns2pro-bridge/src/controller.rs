@@ -256,6 +256,7 @@ impl<'a, L: GattLink> Controller<'a, L> {
         let led_task = async {
             loop {
                 let v = *leds.borrow_and_update();
+                tracing::info!(mask = format_args!("{v:#04x}"), "player LEDs set");
                 self.command(&command::set_player_leds(v)).await?;
                 leds.changed().await.map_err(|_| LinkError::Closed)?;
             }

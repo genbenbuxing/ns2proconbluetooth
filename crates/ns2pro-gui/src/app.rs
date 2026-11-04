@@ -134,6 +134,7 @@ impl App {
             quitting: false,
             settings,
         };
+        app.bridge.set_keep_leds_lit(app.settings.keep_leds_lit);
         app.run_checks(&cc.egui_ctx, app.settings.auto_connect);
         app
     }
@@ -378,6 +379,14 @@ impl App {
         changed |= ui
             .checkbox(&mut self.settings.auto_connect, t.auto_connect)
             .changed();
+        if ui
+            .checkbox(&mut self.settings.keep_leds_lit, t.keep_leds_lit)
+            .on_hover_text(t.keep_leds_lit_hint)
+            .changed()
+        {
+            self.bridge.set_keep_leds_lit(self.settings.keep_leds_lit);
+            changed = true;
+        }
         if self.tray.is_some() {
             changed |= ui
                 .checkbox(&mut self.settings.close_to_tray, t.close_to_tray)

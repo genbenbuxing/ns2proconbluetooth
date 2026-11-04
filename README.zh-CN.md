@@ -47,14 +47,14 @@
 - **环境检测**：检查蓝牙 LE 适配器和 usbip-win2 驱动；缺少驱动时给出 usbip-win2 官方下载页链接（程序本身不会下载或安装任何东西）。
 - **托盘图标**：可设置为关闭窗口后最小化到右下角托盘继续运行；托盘菜单可以显示窗口、连接、断开、退出。勾选**开机自动启动**后会在登录时最小化到托盘启动。
 - **中文 / English** 界面，默认跟随 Windows 系统语言。
-- **插线检测**：用数据线连接手柄时，程序会暂停蓝牙桥接并移除虚拟手柄，避免 Windows 里同时出现两个手柄；拔掉数据线后自动恢复蓝牙连接。
+- **插线检测**：用数据线连接手柄时，程序会暂停蓝牙桥接并移除虚拟手柄，避免 Windows 里同时出现两个手柄；拔掉数据线后自动恢复蓝牙连接（如果手柄没有自动连上，按一下手柄上的 Home 键）。
+- **连接时保持手柄指示灯常亮**（默认开启）：游戏或 Steam 要求关闭全部玩家指示灯时，改为显示默认灯型，方便确认手柄已连接；玩家编号等其他灯型照常显示。
 - **日志文件**：`%LOCALAPPDATA%\ns2pro-bridge\gui.log`（上一次运行的日志保留为 `gui.log.old`）；“运行日志”页有“打开日志文件夹”按钮。
 
 退出时（托盘菜单 → 退出，或在关闭托盘模式时直接关窗口）程序总会先断开手柄、拔出虚拟 USB 设备。同一时间只能运行一个实例，也不要和命令行版 `ns2pro-bridge.exe` 同时运行。设置保存在 `%LOCALAPPDATA%\ns2pro-bridge\gui-settings.json`。
 
-### 已知问题（正在解决）
+### 已知问题
 
-- **蓝牙之后改用数据线**：插线后程序会暂停蓝牙桥接，但 Steam 可能无法使用有线手柄（Steam 的手柄日志显示为 "If_Hid"，没有完成初始化）。蓝牙使用不受影响。修复完成前请继续使用蓝牙连接。
 - **蓝牙卡顿或断连**：通常是信号太弱。如果是主板自带的 Wi-Fi/蓝牙，请确认已经接上 Wi-Fi 天线，蓝牙和 Wi-Fi 共用这根天线。
 
 ## 在 Windows 上使用
@@ -108,6 +108,7 @@ cargo test --locked --workspace
 | `--log-level LEVEL` | `info` | `trace`/`debug`/`info`/`warn`/`error`/`off`；`RUST_LOG` 优先 |
 | `--pair-host` | 关闭 | 每次运行时重新配对主机一次 |
 | `--host-address MAC` | 适配器地址 | 配对时使用的主机地址 |
+| `--keep-leds-lit` | 关闭 | 主机要求关闭全部玩家指示灯时改为显示默认灯型 |
 | `--cache-file PATH` | Windows：`%LOCALAPPDATA%\ns2pro-bridge\controller-cache.json`；Linux：`/var/lib/ns2pro-bridge/controller-cache.json` | 保存手柄地址 |
 | `--feature-flags FLAGS` | `0x07` | 按键、摇杆、IMU 功能标志 |
 | `--bt-smoke-test` | 关闭 | 只检查蓝牙适配器和扫描 |

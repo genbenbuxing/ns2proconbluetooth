@@ -35,6 +35,10 @@ pub struct Options {
     /// Feature flags (buttons, sticks, IMU); hexadecimal or decimal
     #[arg(long,default_value=default_feature_flags(),value_parser=parse_flags)]
     pub feature_flags: u8,
+    /// Keep the player LEDs lit: a host request to turn them all off shows the
+    /// default pattern instead
+    #[arg(long)]
+    pub keep_leds_lit: bool,
     /// Log level: trace, debug, info, warn, error or off; `RUST_LOG` takes precedence
     #[arg(long, default_value = "info",value_parser=parse_level)]
     pub log_level: String,

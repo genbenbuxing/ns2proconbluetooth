@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2](https://github.com/genbenbuxing/ns2proconbluetooth/compare/v0.5.1...v0.5.2) - 2026-11-04
+
+### Added
+
+- `--keep-leds-lit`: a host request to turn every player LED off shows the default pattern instead, so a connected controller always has a lit indicator. The desktop app enables it by default (Settings tab).
+- Every player LED mask sent to the controller is logged at info level.
+
+### Fixed
+
+- Plugging the controller in by cable after using Bluetooth: Steam now initializes the wired controller. The virtual controller had the same USB serial number ("00") as the real one, so Windows gave the real controller a different device instance and Steam treated it as a plain HID device. The virtual controller now reports the serial number "NS2BRIDGE".
+
 ## [0.5.1](https://github.com/genbenbuxing/ns2proconbluetooth/compare/v0.5.0...v0.5.1) - 2026-11-04
 
 ### Added

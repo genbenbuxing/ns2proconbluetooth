@@ -27,6 +27,17 @@ fn control_fixtures() {
         .contains(&name)
         {
             assert!(result.is_err(), "intentional STALL: {name}");
+        } else if name == "string_3" {
+            // Deliberate divergence from VIIPER's "00": see descriptors::STRING_3.
+            let serial: Vec<u8> = "NS2BRIDGE"
+                .encode_utf16()
+                .flat_map(u16::to_le_bytes)
+                .collect();
+            assert_eq!(
+                result.unwrap().0,
+                [&[20, 3][..], &serial].concat(),
+                "{name}"
+            );
         } else {
             assert_eq!(result.unwrap().0, hex(&row["response"]), "{name}");
         }
