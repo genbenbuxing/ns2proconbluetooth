@@ -18,6 +18,33 @@ use windows::{
     core::{HSTRING, PCWSTR, w},
 };
 
+/// Stops the raw mouse and keyboard input that winit registers for every window.
+///
+/// winit asks Windows for raw input while the window is in the foreground, and
+/// eframe redraws once per raw mouse movement while the pointer is over the
+/// window. With a high polling-rate mouse (1000–8000 Hz) that is thousands of
+/// redraws per second, and the cursor stutters system-wide. The app only needs
+/// ordinary window messages, which are unaffected.
+pub fn disable_raw_input() {
+    use windows::Win32::UI::Input::{RAWINPUTDEVICE, RIDEV_REMOVE, RegisterRawInputDevices};
+    // HID usage page 1 (generic desktop): usage 2 is mouse, 6 is keyboard.
+    let devices = [2, 6].map(|usage| RAWINPUTDEVICE {
+        usUsagePage: 1,
+        usUsage: usage,
+        dwFlags: RIDEV_REMOVE,
+        hwndTarget: HWND::default(),
+    });
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "RAWINPUTDEVICE is 16 bytes"
+    )]
+    let size = size_of::<RAWINPUTDEVICE>() as u32;
+    // SAFETY: `devices` is a valid array; RIDEV_REMOVE requires a null target window.
+    if let Err(error) = unsafe { RegisterRawInputDevices(&devices, size) } {
+        tracing::warn!(%error, "could not stop raw input");
+    }
+}
+
 /// Holds the named mutex for the life of the process.
 pub struct SingleInstance(#[allow(dead_code)] HANDLE);
 

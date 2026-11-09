@@ -68,7 +68,18 @@ fn main() -> eframe::Result {
     // Started by Windows at login: stay in the tray.
     let minimized = std::env::args().any(|arg| arg == "--minimized");
     let (rgba, size) = system::icon_rgba();
+    // Draw through Direct3D 12 and DXGI, the native Windows path. OpenGL (and
+    // Vulkan) presentation made the mouse pointer stutter over the window on an
+    // NVIDIA RTX 50 system with Windows 11.
+    let mut setup = eframe::egui_wgpu::WgpuSetupCreateNew::without_display_handle();
+    setup.instance_descriptor.backends = eframe::wgpu::Backends::DX12;
+    let wgpu_options = eframe::egui_wgpu::WgpuConfiguration {
+        wgpu_setup: eframe::egui_wgpu::WgpuSetup::CreateNew(setup),
+        ..Default::default()
+    };
     let options = eframe::NativeOptions {
+        renderer: eframe::Renderer::Wgpu,
+        wgpu_options,
         viewport: eframe::egui::ViewportBuilder::default()
             .with_title(text.title)
             .with_inner_size([480.0, 640.0])

@@ -26,13 +26,14 @@ tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-eframe = { version = "0.37", default-features = false, features = ["glow", "default_fonts", "accesskit"] }
+eframe = { version = "0.37", default-features = false, features = ["wgpu", "default_fonts", "accesskit"] }
 tray-icon = "0.26"
 raw-window-handle = "0.6"
 windows = { workspace = true, features = [
   "Win32_Devices_DeviceAndDriverInstallation",
   "Win32_Foundation",
   "Win32_Globalization",
+  "Win32_UI_Input",
   "Win32_System_Registry",
   "Win32_System_Threading",
   "Win32_UI_WindowsAndMessaging",

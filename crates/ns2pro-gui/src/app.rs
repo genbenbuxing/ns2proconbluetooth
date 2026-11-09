@@ -113,6 +113,7 @@ impl App {
         settings: Settings,
         window: Option<Window>,
     ) -> Self {
+        system::disable_raw_input();
         system::install_fonts(&cc.egui_ctx);
         install_style(&cc.egui_ctx);
         let ctx = cc.egui_ctx.clone();

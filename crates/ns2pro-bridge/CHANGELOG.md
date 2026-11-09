@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3](https://github.com/genbenbuxing/ns2proconbluetooth/compare/v0.5.2...v0.5.3) - 2026-11-10
+
+### Fixed
+
+- Desktop app: the mouse pointer no longer stutters while the window is in the foreground. The window now draws through Direct3D 12 instead of OpenGL, whose presentation made the pointer stutter over the window (seen on Windows 11 with an NVIDIA RTX 50 GPU), and it no longer registers for raw mouse and keyboard input, which it does not use.
+
 ## [0.5.2](https://github.com/genbenbuxing/ns2proconbluetooth/compare/v0.5.1...v0.5.2) - 2026-11-04
 
 ### Added
